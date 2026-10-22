@@ -26,6 +26,8 @@ GREEN = ("#BCE84A", "#9ACD2C", "#6F9A18")
 GRAY = ("#66707C", "#4E5761", "#25292E")
 INK = ("#4A5059", "#30353B", "#121417")
 WHITE = ("#FFFFFF", "#E9EDF1", "#9AA4AE")
+# Neon green outline drawn around the dark parts (gray arrow and lettering).
+NEON = "#A6FF1F"
 
 # Extrusion vector (down-left, like the original) and number of layers.
 DEPTH = (-5.0, 4.0)
@@ -60,17 +62,22 @@ def gradient(gid, colors):
     )
 
 
-def raised(d, gid, colors, depth=DEPTH, flat=False):
-    """A shape with a solid extruded side and a gradient face."""
+def raised(d, gid, colors, depth=DEPTH, flat=False, outline=0.0):
+    """A shape with a solid extruded side and a gradient face, optionally outlined."""
     if flat:
         return f'<path fill="{colors[0]}" d="{d}"/>'
+    stroke = (
+        f' stroke="{NEON}" stroke-width="{outline}" stroke-linejoin="round" paint-order="stroke"'
+        if outline
+        else ""
+    )
     side = "".join(
         f'<use href="#{gid}-s" x="{depth[0] * i / LAYERS:.2f}" y="{depth[1] * i / LAYERS:.2f}"/>'
         for i in range(LAYERS, 0, -1)
     )
     return (
         f'<path id="{gid}-s" fill="{colors[2]}" d="{d}"/>{side}'
-        f'<path fill="url(#{gid})" d="{d}"/>'
+        f'<path fill="url(#{gid})"{stroke} d="{d}"/>'
     )
 
 
@@ -93,27 +100,27 @@ def main():
     width = 250 + title_w + 12
     height = 240
 
-    def lockup(word, sub, mark_gray, flat=False):
+    def lockup(word, sub, mark_gray, flat=False, outline=False):
         defs = "".join(
             gradient(gid, c)
             for gid, c in [("g-green", GREEN), ("g-gray", mark_gray), ("g-word", word), ("g-sub", sub)]
         )
         body = (
             raised(GREEN_D, "g-green", GREEN, flat=flat)
-            + raised(GRAY_D, "g-gray", mark_gray, flat=flat)
-            + raised(title_d, "g-word", word, flat=flat)
-            + raised(sub_d, "g-sub", sub, depth=(-3.0, 2.5), flat=flat)
+            + raised(GRAY_D, "g-gray", mark_gray, flat=flat, outline=6 if outline else 0)
+            + raised(title_d, "g-word", word, flat=flat, outline=5 if outline else 0)
+            + raised(sub_d, "g-sub", sub, depth=(-3.0, 2.5), flat=flat, outline=3.5 if outline else 0)
         )
         return defs, body
 
-    defs, body = lockup(GRAY, INK, GRAY)
+    defs, body = lockup(GRAY, INK, GRAY, outline=True)
     (OUT / "logo.svg").write_text(svg(width, height, body, defs))
 
     defs, body = lockup(WHITE, WHITE, WHITE)
     (OUT / "logo-white.svg").write_text(svg(width, height, body, defs))
 
     mark_defs = gradient("g-green", GREEN) + gradient("g-gray", GRAY)
-    mark = raised(GREEN_D, "g-green", GREEN) + raised(GRAY_D, "g-gray", GRAY)
+    mark = raised(GREEN_D, "g-green", GREEN) + raised(GRAY_D, "g-gray", GRAY, outline=6)
     (OUT / "logo-mark.svg").write_text(svg(232, 240, mark, mark_defs))
 
     mono = raised(GREEN_D, "m", WHITE, flat=True) + raised(GRAY_D, "m", WHITE, flat=True)
