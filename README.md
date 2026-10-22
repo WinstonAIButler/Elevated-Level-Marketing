@@ -44,7 +44,7 @@ Other scripts: `npm test` (unit tests), `npm run lint` (type check), `npm run bu
 
 **Render (one click):** `render.yaml` is a Render Blueprint that creates the website, a Postgres database and the weekly autopilot job, and generates `AUTH_SECRET` and `CRON_SECRET`. In Render choose *New → Blueprint*, pick this repo, then fill in `ANTHROPIC_API_KEY` (optional, demo mode without it) and `APP_URL` (the site's public URL). Database migrations run automatically on each deploy.
 
-**Vercel:** import the repo, add the env vars above, set the build command to `prisma migrate deploy && npm run build`, and deploy. `vercel.json` schedules the autopilot job.
+**Vercel:** import the repo, add a Neon Postgres database from the project's *Storage* tab (it sets `DATABASE_URL`), add `AUTH_SECRET` and `CRON_SECRET`, and deploy. The `vercel-build` script runs database migrations on every deploy, and `vercel.json` schedules the autopilot job.
 
 ## Logo files
 
