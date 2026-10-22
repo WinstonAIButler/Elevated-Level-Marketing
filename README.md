@@ -44,7 +44,9 @@ Other scripts: `npm test` (unit tests), `npm run lint` (type check), `npm run bu
 
 **Render (one click):** `render.yaml` is a Render Blueprint that creates the website, a Postgres database and the weekly autopilot job, and generates `AUTH_SECRET` and `CRON_SECRET`. In Render choose *New → Blueprint*, pick this repo, then fill in `ANTHROPIC_API_KEY` (optional, demo mode without it) and `APP_URL` (the site's public URL). Database migrations run automatically on each deploy.
 
-**Vercel:** import the repo, add a Neon Postgres database from the project's *Storage* tab (it sets `DATABASE_URL`), add `AUTH_SECRET` and `CRON_SECRET`, and deploy. The `vercel-build` script runs database migrations on every deploy, and `vercel.json` schedules the autopilot job.
+**Vercel:** import the repo, add a Neon Postgres database from the project's *Storage* tab (it sets `DATABASE_URL`), add `AUTH_SECRET` and `CRON_SECRET` (plus `ANTHROPIC_API_KEY` to switch on AI), and deploy. The `vercel-build` script runs database migrations on every deploy (and skips them with a warning if no database is connected yet), and `vercel.json` schedules the autopilot job.
+
+**Setup check:** open `/api/health` on the live site. It reports whether the database, login secret, AI key, payments and autopilot are configured, without showing any values.
 
 ## Logo files
 
