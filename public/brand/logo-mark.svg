@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Elevated Digital Marketing"><title>Elevated Digital Marketing</title>
+  <defs>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A8D932"/><stop offset="1" stop-color="#86B51F"/>
+    </linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#545E6A"/><stop offset="1" stop-color="#3B434D"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#g-green)" d="M48 26.5A90 90 0 0 0 48 173.5Z"/>
+  <path fill="url(#g-gray)" d="M62 22H112V6L190 100A90 90 0 0 1 62 181.6V118H128L141 100L128 84H62Z"/>
+</svg>

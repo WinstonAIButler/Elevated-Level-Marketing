@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Tier {
+  TRIAL
+  STARTER
+  GROWTH
+  ELITE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskOwner {
+  AI
+  CLIENT
+  TEAM
+}
+
+enum CampaignStatus {
+  DRAFT
+  APPROVED
+  SCHEDULED
+  LIVE
+  COMPLETED
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  passwordHash       String
+  tier               Tier      @default(TRIAL)
+  subscriptionStatus String?
+  stripeCustomerId   String?   @unique
+  autopilot          Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  business           Business?
+}
+
+model Business {
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  industry       String
+  website        String?
+  location       String?
+  description    String
+  targetAudience String
+  goals          String
+  brandVoice     String?
+  competitors    String?
+  monthlyBudget  Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  assessments    Assessment[]
+  plans          MarketingPlan[]
+  campaigns      Campaign[]
+  activity       Activity[]
+}
+
+model Assessment {
+  id              String          @id @default(cuid())
+  businessId      String
+  business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  answers         Json
+  scores          Json
+  overallScore    Int
+  summary         String
+  strengths       Json
+  weaknesses      Json
+  recommendations Json
+  aiGenerated     Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  plans           MarketingPlan[]
+}
+
+model MarketingPlan {
+  id               String      @id @default(cuid())
+  businessId       String
+  business         Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  assessmentId     String?
+  assessment       Assessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  title            String
+  summary          String
+  objectives       Json
+  channelStrategy  Json
+  budgetAllocation Json
+  kpis             Json
+  durationWeeks    Int         @default(12)
+  startDate        DateTime    @default(now())
+  active           Boolean     @default(true)
+  aiGenerated      Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  tasks            Task[]
+  campaigns        Campaign[]
+}
+
+model Task {
+  id          String        @id @default(cuid())
+  planId      String
+  plan        MarketingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  channel     String
+  week        Int
+  dueDate     DateTime
+  owner       TaskOwner     @default(AI)
+  status      TaskStatus    @default(TODO)
+  completedAt DateTime?
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  businessId  String
+  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  planId      String?
+  plan        MarketingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  name        String
+  objective   String
+  channels    String[]
+  audience    String
+  offer       String?
+  budget      Int            @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  status      CampaignStatus @default(DRAFT)
+  content     Json
+  aiGenerated Boolean        @default(false)
+  autopilot   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  kind       String
+  message    String
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
