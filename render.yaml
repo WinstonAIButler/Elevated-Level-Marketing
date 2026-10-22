@@ -1,0 +1,49 @@
+# Render Blueprint: one click deploys the website, its Postgres database and
+# the weekly autopilot job. https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: elevated-web
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: elevated-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+  - type: cron
+    name: elevated-autopilot
+    runtime: node
+    plan: starter
+    schedule: "0 13 * * 1" # Mondays 13:00 UTC
+    buildCommand: "true"
+    startCommand: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" "https://$WEB_HOST/api/cron/autopilot"'
+    envVars:
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: elevated-web
+          envVarKey: CRON_SECRET
+      - key: WEB_HOST
+        fromService:
+          type: web
+          name: elevated-web
+          property: host
+
+databases:
+  - name: elevated-db
+    plan: basic-256mb
+    databaseName: elevated

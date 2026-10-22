@@ -34,13 +34,17 @@ Other scripts: `npm test` (unit tests), `npm run lint` (type check), `npm run bu
 
 | Service | Why | Env vars |
 | --- | --- | --- |
-| **Hosting** – [Vercel](https://vercel.com) (recommended; `vercel.json` already schedules the weekly cron) | Runs the site. Pro plan recommended so AI requests can run up to 5 minutes. | `APP_URL` (your domain), `AUTH_SECRET` (`openssl rand -base64 32`), `CRON_SECRET` |
+| **Hosting** – [Render](https://render.com) (`render.yaml`) or [Vercel](https://vercel.com) (`vercel.json`) | Runs the site and the weekly autopilot job. On Vercel, the Pro plan is recommended so AI requests can run up to 5 minutes. | `APP_URL` (your domain), `AUTH_SECRET` (`openssl rand -base64 32`), `CRON_SECRET` |
 | **Database** – any Postgres, e.g. [Neon](https://neon.tech) or [Supabase](https://supabase.com) | Stores accounts, assessments, plans, campaigns. | `DATABASE_URL` |
 | **AI** – [Anthropic Console](https://console.anthropic.com) API key with billing enabled | Generates assessments, plans and campaigns (model `claude-opus-5-5` by default). | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` |
 | **Payments** – [Stripe](https://dashboard.stripe.com) account | Subscriptions. Create three monthly recurring prices (Starter $149, Growth $399, Elite $899 or your own), enable the customer portal, and add a webhook to `https://<your-domain>/api/stripe/webhook` for `checkout.session.completed` and `customer.subscription.*`. | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`, `STRIPE_PRICE_ELITE` |
 | **Domain** | Your public URL, pointed at the host. | `APP_URL` |
 
-Deploy on Vercel: import the repo, add the env vars above, set the build command to `prisma migrate deploy && npm run build`, and deploy.
+### Deploying
+
+**Render (one click):** `render.yaml` is a Render Blueprint that creates the website, a Postgres database and the weekly autopilot job, and generates `AUTH_SECRET` and `CRON_SECRET`. In Render choose *New → Blueprint*, pick this repo, then fill in `ANTHROPIC_API_KEY` (optional, demo mode without it) and `APP_URL` (the site's public URL). Database migrations run automatically on each deploy.
+
+**Vercel:** import the repo, add the env vars above, set the build command to `prisma migrate deploy && npm run build`, and deploy. `vercel.json` schedules the autopilot job.
 
 ## Logo files
 
