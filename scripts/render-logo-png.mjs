@@ -22,7 +22,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 for (const [src, out, width] of jobs) {
   const svg = readFileSync(path.join(brand, src), "utf8");
-  const [, vw, vh] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number);
+  const [, vw, vh] = svg.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/).map(Number);
   const height = Math.round((width * vh) / vw);
   await page.setViewportSize({ width, height });
   const sized = svg.replace(/width="[\d.]+" height="[\d.]+"/, `width="${width}" height="${height}"`);

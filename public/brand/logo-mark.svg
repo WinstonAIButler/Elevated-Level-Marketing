@@ -1,12 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Elevated Digital Marketing"><title>Elevated Digital Marketing</title>
-  <defs>
-    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#A8D932"/><stop offset="1" stop-color="#86B51F"/>
-    </linearGradient>
-    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#545E6A"/><stop offset="1" stop-color="#3B434D"/>
-    </linearGradient>
-  </defs>
-  <path fill="url(#g-green)" d="M48 26.5A90 90 0 0 0 48 173.5Z"/>
-  <path fill="url(#g-gray)" d="M62 22H112V6L190 100A90 90 0 0 1 62 181.6V118H128L141 100L128 84H62Z"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 0 240 240" width="240" height="240" role="img" aria-label="Elevated Digital Marketing"><title>Elevated Digital Marketing</title><defs><linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BCE84A"/><stop offset="1" stop-color="#9ACD2C"/></linearGradient><linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#66707C"/><stop offset="1" stop-color="#4E5761"/></linearGradient></defs><path id="g-green-s" fill="#6F9A18" d="M62 32A103 103 0 0 0 62 204Z"/><use href="#g-green-s" x="-5.00" y="4.00"/><use href="#g-green-s" x="-4.50" y="3.60"/><use href="#g-green-s" x="-4.00" y="3.20"/><use href="#g-green-s" x="-3.50" y="2.80"/><use href="#g-green-s" x="-3.00" y="2.40"/><use href="#g-green-s" x="-2.50" y="2.00"/><use href="#g-green-s" x="-2.00" y="1.60"/><use href="#g-green-s" x="-1.50" y="1.20"/><use href="#g-green-s" x="-1.00" y="0.80"/><use href="#g-green-s" x="-0.50" y="0.40"/><path fill="url(#g-green)" d="M62 32A103 103 0 0 0 62 204Z"/><path id="g-gray-s" fill="#25292E" d="M82 47H157L134 22A100 100 0 0 1 143 215L157 173H84V133H177L206 110L177 87H82Z"/><use href="#g-gray-s" x="-5.00" y="4.00"/><use href="#g-gray-s" x="-4.50" y="3.60"/><use href="#g-gray-s" x="-4.00" y="3.20"/><use href="#g-gray-s" x="-3.50" y="2.80"/><use href="#g-gray-s" x="-3.00" y="2.40"/><use href="#g-gray-s" x="-2.50" y="2.00"/><use href="#g-gray-s" x="-2.00" y="1.60"/><use href="#g-gray-s" x="-1.50" y="1.20"/><use href="#g-gray-s" x="-1.00" y="0.80"/><use href="#g-gray-s" x="-0.50" y="0.40"/><path fill="url(#g-gray)" d="M82 47H157L134 22A100 100 0 0 1 143 215L157 173H84V133H177L206 110L177 87H82Z"/></svg>

@@ -1,27 +1,40 @@
 """Generate the Elevated Digital Marketing logo set as clean vector SVGs.
 
-Text is converted to outlines (Inter, SIL OFL) so the SVGs render identically
-everywhere without needing the font installed.
+Recreates the original artwork: a split circle (green crescent on the left, a
+gray right half whose two bars leave a right-pointing arrow in the negative
+space) next to a chunky ELEVATED / DIGITAL MARKETING wordmark, all with the
+original's raised 3D look (extruded down and to the left).
 
-Usage: python3 scripts/build-logo.py [path/to/Inter-Black.otf] [path/to/Inter-Bold.otf]
-Requires: pip install fonttools
+Text is converted to outlines (Rubik, SIL OFL, in scripts/fonts/) so the SVGs
+render identically everywhere without the font installed.
+
+Usage: python3 scripts/build-logo.py      (requires: pip install fonttools)
 """
-import sys
 from pathlib import Path
 
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-FONT_DIR = Path("/usr/share/fonts/opentype/inter")
-BLACK = Path(sys.argv[1]) if len(sys.argv) > 1 else FONT_DIR / "Inter-Black.otf"
-BOLD = Path(sys.argv[2]) if len(sys.argv) > 2 else FONT_DIR / "Inter-ExtraBold.otf"
-OUT = Path(__file__).resolve().parent.parent / "public" / "brand"
+HERE = Path(__file__).resolve().parent
+TITLE_FONT = HERE / "fonts" / "rubik-latin-900-normal.woff"
+SUB_FONT = HERE / "fonts" / "rubik-latin-800-normal.woff"
+OUT = HERE.parent / "public" / "brand"
 
-GREEN = "#A8D932"
-GREEN_DARK = "#86B51F"
-GRAY = "#545E6A"
-GRAY_DARK = "#3B434D"
+# Face gradient (top, bottom) and extrusion side color for each part.
+GREEN = ("#BCE84A", "#9ACD2C", "#6F9A18")
+GRAY = ("#66707C", "#4E5761", "#25292E")
+INK = ("#4A5059", "#30353B", "#121417")
+WHITE = ("#FFFFFF", "#E9EDF1", "#9AA4AE")
+
+# Extrusion vector (down-left, like the original) and number of layers.
+DEPTH = (-5.0, 4.0)
+LAYERS = 10
+
+GREEN_D = "M62 32A103 103 0 0 0 62 204Z"
+GRAY_D = (
+    "M82 47H157L134 22A100 100 0 0 1 143 215L157 173H84V133H177L206 110L177 87H82Z"
+)
 
 
 def text_path(font_file, text, size, x, y, tracking=0.0):
@@ -33,68 +46,78 @@ def text_path(font_file, text, size, x, y, tracking=0.0):
     pen = SVGPathPen(glyphs)
     cursor = 0.0
     for ch in text:
-        name = cmap[ord(ch)]
-        glyph = glyphs[name]
-        tp = TransformPen(pen, (scale, 0, 0, -scale, x + cursor, y))
-        glyph.draw(tp)
+        glyph = glyphs[cmap[ord(ch)]]
+        glyph.draw(TransformPen(pen, (scale, 0, 0, -scale, x + cursor, y)))
         cursor += glyph.width * scale + tracking
     return pen.getCommands(), cursor - tracking
 
 
-# Mark: a circle split into a green crescent (left) and a gray "E" whose
-# middle stroke is a right-pointing arrow. 200x200 coordinate space.
-MARK = f"""
-  <defs>
-    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="{GREEN}"/><stop offset="1" stop-color="{GREEN_DARK}"/>
-    </linearGradient>
-    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="{GRAY}"/><stop offset="1" stop-color="{GRAY_DARK}"/>
-    </linearGradient>
-  </defs>
-  <path fill="url(#g-green)" d="M48 26.5A90 90 0 0 0 48 173.5Z"/>
-  <path fill="url(#g-gray)" d="M62 22H112V6L190 100A90 90 0 0 1 62 181.6V118H128L141 100L128 84H62Z"/>
-"""
-
-MARK_MONO = """
-  <path fill="{c}" d="M48 26.5A90 90 0 0 0 48 173.5Z"/>
-  <path fill="{c}" d="M62 22H112V6L190 100A90 90 0 0 1 62 181.6V118H128L141 100L128 84H62Z"/>
-"""
-
-
-def svg(width, height, body, title="Elevated Digital Marketing"):
+def gradient(gid, colors):
+    top, bottom, _ = colors
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
-        f'width="{width:.0f}" height="{height:.0f}" role="img" aria-label="{title}">'
-        f"<title>{title}</title>{body}</svg>\n"
+        f'<linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0" stop-color="{top}"/><stop offset="1" stop-color="{bottom}"/></linearGradient>'
+    )
+
+
+def raised(d, gid, colors, depth=DEPTH, flat=False):
+    """A shape with a solid extruded side and a gradient face."""
+    if flat:
+        return f'<path fill="{colors[0]}" d="{d}"/>'
+    side = "".join(
+        f'<use href="#{gid}-s" x="{depth[0] * i / LAYERS:.2f}" y="{depth[1] * i / LAYERS:.2f}"/>'
+        for i in range(LAYERS, 0, -1)
+    )
+    return (
+        f'<path id="{gid}-s" fill="{colors[2]}" d="{d}"/>{side}'
+        f'<path fill="url(#{gid})" d="{d}"/>'
+    )
+
+
+def svg(width, height, body, defs="", title="Elevated Digital Marketing"):
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 0 {width + 8:.0f} {height:.0f}" '
+        f'width="{width + 8:.0f}" height="{height:.0f}" role="img" aria-label="{title}">'
+        f"<title>{title}</title><defs>{defs}</defs>{body}</svg>\n"
     )
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
 
-    # Horizontal lockup: mark at left, wordmark to the right.
-    title_d, title_w = text_path(BLACK, "ELEVATED", 112, 230, 112, tracking=2)
-    sub_size = 44
-    # Spread the subline so it spans the same width as ELEVATED.
-    _, raw_w = text_path(BOLD, "DIGITAL MARKETING", sub_size, 0, 0)
+    title_d, title_w = text_path(TITLE_FONT, "ELEVATED", 78, 250, 140, tracking=3)
+    sub_size = 38
+    _, raw_w = text_path(SUB_FONT, "DIGITAL MARKETING", sub_size, 0, 0)
     tracking = (title_w - raw_w) / (len("DIGITAL MARKETING") - 1)
-    sub_d, _ = text_path(BOLD, "DIGITAL MARKETING", sub_size, 232, 178, tracking=tracking)
-    width = 230 + title_w + 10
+    sub_d, _ = text_path(SUB_FONT, "DIGITAL MARKETING", sub_size, 252, 196, tracking=tracking)
+    width = 250 + title_w + 12
+    height = 240
 
-    def lockup(word_fill, sub_fill, mark):
-        return (
-            mark
-            + f'<path fill="{word_fill}" d="{title_d}"/>'
-            + f'<path fill="{sub_fill}" d="{sub_d}"/>'
+    def lockup(word, sub, mark_gray, flat=False):
+        defs = "".join(
+            gradient(gid, c)
+            for gid, c in [("g-green", GREEN), ("g-gray", mark_gray), ("g-word", word), ("g-sub", sub)]
         )
+        body = (
+            raised(GREEN_D, "g-green", GREEN, flat=flat)
+            + raised(GRAY_D, "g-gray", mark_gray, flat=flat)
+            + raised(title_d, "g-word", word, flat=flat)
+            + raised(sub_d, "g-sub", sub, depth=(-3.0, 2.5), flat=flat)
+        )
+        return defs, body
 
-    (OUT / "logo.svg").write_text(svg(width, 200, lockup("url(#g-gray)", GRAY, MARK)))
-    (OUT / "logo-white.svg").write_text(
-        svg(width, 200, lockup("#FFFFFF", "#E6EAEE", MARK.replace("url(#g-gray)", "#FFFFFF")))
-    )
-    (OUT / "logo-mark.svg").write_text(svg(200, 200, MARK))
-    (OUT / "logo-mark-mono.svg").write_text(svg(200, 200, MARK_MONO.format(c="#FFFFFF")))
+    defs, body = lockup(GRAY, INK, GRAY)
+    (OUT / "logo.svg").write_text(svg(width, height, body, defs))
+
+    defs, body = lockup(WHITE, WHITE, WHITE)
+    (OUT / "logo-white.svg").write_text(svg(width, height, body, defs))
+
+    mark_defs = gradient("g-green", GREEN) + gradient("g-gray", GRAY)
+    mark = raised(GREEN_D, "g-green", GREEN) + raised(GRAY_D, "g-gray", GRAY)
+    (OUT / "logo-mark.svg").write_text(svg(232, 240, mark, mark_defs))
+
+    mono = raised(GREEN_D, "m", WHITE, flat=True) + raised(GRAY_D, "m", WHITE, flat=True)
+    (OUT / "logo-mark-mono.svg").write_text(svg(232, 240, mono))
     print(f"wrote logo set to {OUT} (lockup width {width:.0f})")
 
 
