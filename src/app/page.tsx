@@ -108,7 +108,7 @@ export default function Home() {
 
       <footer className="site-footer">
         <div className="container row between">
-          <Logo variant="white" />
+          <Logo />
           <span>© {new Date().getFullYear()} Elevated Digital Marketing. All rights reserved.</span>
         </div>
       </footer>
