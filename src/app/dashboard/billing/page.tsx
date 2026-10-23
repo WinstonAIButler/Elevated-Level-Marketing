@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { stripeEnabled } from "@/lib/stripe";
-import { PAID_TIERS, TIERS } from "@/lib/tiers";
+import { AD_SPEND_NOTE, PAID_TIERS, TIERS } from "@/lib/tiers";
 import { usageThisMonth } from "@/lib/usage";
 import { openBillingPortal, startCheckout } from "@/app/actions/account";
 
@@ -43,11 +43,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </table>
       </div>
 
+      <p className="ad-spend-note" style={{ marginBottom: 16 }}>{AD_SPEND_NOTE}</p>
       <div className="grid grid-3">
         {PAID_TIERS.map((t) => (
           <div className={`card ${t.id === user.tier ? "featured" : ""}`} key={t.id}>
             <h3>{t.name}</h3>
             <div className="price">${t.price}<small>/month</small></div>
+            <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ your own ad spend</p>
             <ul className="feature-list">{t.features.map((f) => <li key={f}>{f}</li>)}</ul>
             {t.id === user.tier ? (
               <span className="badge badge-good">Current plan</span>

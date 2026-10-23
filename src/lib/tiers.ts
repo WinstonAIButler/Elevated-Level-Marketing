@@ -63,6 +63,11 @@ export const TIERS: Record<Tier, TierInfo> = {
   },
 };
 
+// Plan prices cover the platform and our service only. Clients pay ad platforms
+// (Google, Meta, TikTok, etc.) directly for their own ad spend.
+export const AD_SPEND_NOTE =
+  "Ad spend is not included. You pay ad platforms like Google and Meta directly for any ads you run, and you decide the budget.";
+
 export const PAID_TIERS = [TIERS.STARTER, TIERS.GROWTH, TIERS.ELITE];
 
 export function tierForStripePrice(priceId: string): Tier | null {

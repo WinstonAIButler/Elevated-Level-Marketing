@@ -12,7 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="dash">
       <aside className="sidebar">
-        <Logo variant="white" href="/dashboard" />
+        <Logo href="/dashboard" />
         <NavLinks />
         <div className="spacer" />
         <div className="account">
