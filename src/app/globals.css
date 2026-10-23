@@ -111,6 +111,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--green); out
 .feature-list { list-style: none; padding: 0; margin: 16px 0 24px; }
 .feature-list li { padding: 6px 0 6px 26px; position: relative; }
 .feature-list li::before { content: ""; position: absolute; left: 0; top: 12px; width: 14px; height: 8px; border-left: 3px solid var(--green-strong); border-bottom: 3px solid var(--green-strong); transform: rotate(-45deg); }
+.ad-spend-note { display: inline-block; margin: 8px 0 0; padding: 6px 14px; border-radius: 12px; background: var(--green-soft); color: var(--ink); font-weight: 600; font-size: 0.9rem; }
 .card.featured { border: 2px solid var(--green); }
 .site-footer { background: var(--ink); color: #aab3bd; padding: 40px 0; font-size: 0.9rem; }
 

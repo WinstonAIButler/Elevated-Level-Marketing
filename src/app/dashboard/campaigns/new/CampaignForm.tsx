@@ -38,6 +38,7 @@ export function CampaignForm({ defaultAudience }: { defaultAudience: string }) {
         <div className="field">
           <label htmlFor="budget">Ad budget for this campaign (USD)</label>
           <input id="budget" name="budget" type="number" min={0} defaultValue={0} />
+          <span className="hint">Paid directly to the ad platforms. Not part of your Elevated plan.</span>
         </div>
         <div className="field">
           <label htmlFor="durationDays">Duration</label>

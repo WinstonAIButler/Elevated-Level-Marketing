@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Logo } from "@/components/Logo";
-import { PAID_TIERS, TIERS } from "@/lib/tiers";
+import { AD_SPEND_NOTE, PAID_TIERS, TIERS } from "@/lib/tiers";
 
 const STEPS = [
   { title: "Sign up & tell us about your business", body: "A five-minute profile: what you sell, who you sell to, your goals and budget." },
@@ -82,6 +82,7 @@ export default function Home() {
           <div className="section-title">
             <h2 style={{ fontSize: "2rem" }}>Simple monthly pricing</h2>
             <p className="muted">Start free with an assessment, a plan and two campaigns. Upgrade when you&apos;re ready.</p>
+            <p className="ad-spend-note">Plan prices do not include ad spend.</p>
           </div>
           <div className="grid grid-3">
             {PAID_TIERS.map((t) => (
@@ -89,6 +90,7 @@ export default function Home() {
                 {t.id === "GROWTH" && <span className="badge badge-good">Most popular</span>}
                 <h3 style={{ marginTop: 8 }}>{t.name}</h3>
                 <div className="price">${t.price}<small>/month</small></div>
+                <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ your own ad spend</p>
                 <p className="muted small">{t.tagline}</p>
                 <ul className="feature-list">{t.features.map((f) => <li key={f}>{f}</li>)}</ul>
                 <Link href="/signup" className={`btn ${t.id === "GROWTH" ? "btn-primary" : "btn-ghost"}`} style={{ width: "100%" }}>
@@ -100,6 +102,7 @@ export default function Home() {
           <p className="muted small" style={{ textAlign: "center", marginTop: 20 }}>
             {TIERS.TRIAL.name}: {TIERS.TRIAL.features.join(", ")}. No card required.
           </p>
+          <p className="muted small" style={{ textAlign: "center", maxWidth: 640, margin: "8px auto 0" }}>{AD_SPEND_NOTE}</p>
         </div>
       </section>
 
