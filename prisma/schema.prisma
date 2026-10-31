@@ -67,6 +67,7 @@ model Business {
   plans          MarketingPlan[]
   campaigns      Campaign[]
   activity       Activity[]
+  websiteAudits  WebsiteAudit[]
 }
 
 model Assessment {
@@ -147,6 +148,19 @@ model Activity {
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   kind       String
   message    String
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+// Weekly SEO and AI-search visibility check of the client's own website.
+model WebsiteAudit {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  url        String
+  score      Int
+  checks     Json
   createdAt  DateTime @default(now())
 
   @@index([businessId, createdAt])

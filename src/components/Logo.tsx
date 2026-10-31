@@ -6,7 +6,7 @@ export function Logo({ href = "/" }: { href?: string }) {
   return (
     <Link href={href} className="logo" aria-label="Elevated Digital Marketing home">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/logo.svg" alt="Elevated Digital Marketing" />
+      <img src="/brand/logo.svg" alt="Elevated Digital Marketing" width={722} height={240} />
     </Link>
   );
 }

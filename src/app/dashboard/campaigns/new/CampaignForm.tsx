@@ -52,9 +52,9 @@ export function CampaignForm({ defaultAudience }: { defaultAudience: string }) {
       </div>
       <div className="field">
         <label htmlFor="notes">Anything else?</label>
-        <textarea id="notes" name="notes" placeholder="Seasonality, must-mention details, things to avoid..." />
+        <textarea id="notes" name="notes" placeholder="Seasonality, must-mention details, things to avoid…" />
       </div>
-      <SubmitButton className="btn btn-primary btn-lg" pendingText="Writing your campaign... (about a minute)">Generate campaign</SubmitButton>
+      <SubmitButton className="btn btn-primary btn-lg" pendingText="Writing your campaign… (about a minute)">Generate campaign</SubmitButton>
     </form>
   );
 }

@@ -62,6 +62,15 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <p className="muted small" style={{ margin: 0 }}><strong>Objective:</strong> {c.objective} · <strong>Audience:</strong> {content.audience}</p>
       </div>
 
+      {content.complianceNotes?.length ? (
+        <div className="alert alert-info" style={{ marginBottom: 20 }}>
+          <strong>Before you publish</strong>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+            {content.complianceNotes.map((n) => <li key={n}>{n}</li>)}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="grid grid-2" style={{ marginBottom: 20 }}>
         <div className="card">
           <h2>Headline options</h2>
