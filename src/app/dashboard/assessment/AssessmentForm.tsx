@@ -28,7 +28,7 @@ export function AssessmentForm({ groups }: { groups: { id: string; label: string
         </fieldset>
       ))}
       <FormMessage state={state} />
-      <SubmitButton className="btn btn-primary btn-lg" pendingText="Analyzing your marketing...">Get my score</SubmitButton>
+      <SubmitButton className="btn btn-primary btn-lg" pendingText="Analyzing your marketing…">Get my score</SubmitButton>
     </form>
   );
 }

@@ -4,6 +4,7 @@ import { db } from "./db";
 import { campaign as generateCampaignContent } from "./ai";
 import { addDays, currentPlanWeek } from "./format";
 import { assertWithinLimit, logActivity } from "./usage";
+import { runWebsiteAudit } from "./site-audit-fetch";
 
 export type AutopilotResult = { businessId: string; actions: string[]; skipped?: string };
 
@@ -14,6 +15,7 @@ const SOCIAL = /instagram|facebook|tiktok|linkedin|social|\bx\b|twitter|youtube|
  *  1. Drafts this week's social content batch from the active plan's channels.
  *  2. Moves this week's AI-owned plan tasks into progress (they are now in review).
  *  3. Logs reminders for overdue tasks that are waiting on the client.
+ *  4. Re-audits the client's website for SEO and AI-search visibility.
  */
 export async function runAutopilot(user: User, business: Business): Promise<AutopilotResult> {
   const actions: string[] = [];
@@ -77,6 +79,21 @@ export async function runAutopilot(user: User, business: Business): Promise<Auto
   if (overdue.length) actions.push(`${overdue.length} task${overdue.length === 1 ? "" : "s"} waiting on you`);
 
   for (const message of actions) await logActivity(business.id, "autopilot", message);
+
+  // The audit logs its own activity entry (with the score change).
+  if (business.website) {
+    const lastAudit = await db.websiteAudit.findFirst({
+      where: { businessId: business.id, createdAt: { gte: addDays(new Date(), -6) } },
+    });
+    if (!lastAudit) {
+      try {
+        const audit = await runWebsiteAudit(business);
+        actions.push(`Website audit scored ${audit.score}/100`);
+      } catch (err) {
+        actions.push(`Website audit skipped: ${err instanceof Error ? err.message : "error"}`);
+      }
+    }
+  }
   return { businessId: business.id, actions };
 }
 

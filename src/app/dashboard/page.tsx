@@ -104,13 +104,13 @@ export default async function Overview() {
           </p>
           <div className="row">
             <form action={toggleAutopilot}>
-              <SubmitButton className="btn btn-ghost btn-sm" pendingText="Saving...">
+              <SubmitButton className="btn btn-ghost btn-sm" pendingText="Saving…">
                 Turn {user.autopilot ? "off" : "on"}
               </SubmitButton>
             </form>
             {plan && (
               <form action={runAutopilotNow}>
-                <SubmitButton className="btn btn-dark btn-sm" pendingText="Running... (this can take a minute)">Run now</SubmitButton>
+                <SubmitButton className="btn btn-dark btn-sm" pendingText="Running… (this can take a minute)">Run now</SubmitButton>
               </form>
             )}
           </div>

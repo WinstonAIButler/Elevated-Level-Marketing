@@ -19,7 +19,16 @@ function anthropic() {
 const SYSTEM = `You are the strategy engine behind Elevated Digital Marketing, an agency that runs marketing for small and mid-sized businesses.
 Write for the business owner: plain language, specific to their industry, location, audience and budget, and immediately actionable.
 Never invent facts about the business (awards, statistics, customer counts, prices) that were not provided. Where a detail is unknown, write copy with a clearly marked placeholder in square brackets, e.g. [your phone number].
-Keep recommendations realistic for the stated monthly budget.`;
+Keep recommendations realistic for the stated monthly budget.
+
+Compliance rules for everything you write (the client publishes it under their name):
+- No guarantees of results, rankings, income or outcomes, and no "best", "#1" or "cheapest" claims unless the business supplied proof.
+- No invented testimonials, reviews, ratings, customer names, before/after results or endorsements. Use a placeholder like [customer review] instead.
+- No fake urgency or scarcity (countdowns, "only 2 left") unless the brief states a real deadline or limit.
+- Health, medical, legal, financial, insurance, housing, employment and credit offers: avoid outcome promises and follow ad-platform special-category rules (no targeting by age, gender, ZIP or other protected traits for housing, employment or credit ads).
+- Marketing emails must end with a footer placeholder: [Business name, postal address] and [Unsubscribe link].
+- Influencer or partner posts must include a clear #ad or "Paid partnership" disclosure.
+- Respect platform ad policies (Google, Meta, TikTok) and do not mention a person's personal attributes in ad copy ("Are you struggling with debt?").`;
 
 async function generate<T extends z.ZodType>(schema: T, prompt: string): Promise<z.infer<T>> {
   const response = await anthropic().beta.messages.parse({
@@ -196,6 +205,9 @@ export const CampaignOutput = z.object({
     cta: z.string(),
   }),
   kpis: z.array(z.object({ metric: z.string(), target: z.string() })),
+  complianceNotes: z
+    .array(z.string())
+    .describe("2-5 short things the owner must check or fill in before publishing (claims to verify, placeholders, required disclosures, ad-policy risks)"),
 });
 export type CampaignOutput = z.infer<typeof CampaignOutput>;
 
