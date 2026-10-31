@@ -12,13 +12,13 @@ export function LoginForm() {
       <FormMessage state={state} />
       <div className="field">
         <label htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" autoComplete="email" required />
+        <input id="email" name="email" type="email" autoComplete="email" spellCheck={false} required />
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>
         <input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
-      <SubmitButton className="btn btn-dark" pendingText="Logging in...">Log in</SubmitButton>
+      <SubmitButton className="btn btn-dark" pendingText="Logging in…">Log in</SubmitButton>
       <p className="small muted">New here? <Link href="/signup">Create an account</Link></p>
     </form>
   );

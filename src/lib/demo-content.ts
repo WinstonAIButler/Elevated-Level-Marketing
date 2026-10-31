@@ -193,20 +193,25 @@ export function campaign(b: Business, brief: CampaignBrief): CampaignOutput {
     ),
     emails: has("email")
       ? [
-          { subject: `A little something from ${b.name}`, previewText: `Claim ${offer}`, body: `Hi [first name],\n\n${b.description}\n\nFor a limited time we're offering ${offer}. Reply to this email or book online to claim it.\n\nThanks,\nThe ${b.name} team` },
-          { subject: `Last chance: ${offer}`, previewText: "Ends this week", body: `Hi [first name],\n\nJust a reminder that ${offer} ends soon. Book now: [link]\n\nThe ${b.name} team` },
+          { subject: `A little something from ${b.name}`, previewText: `Claim ${offer}`, body: `Hi [first name],\n\n${b.description}\n\nRight now we're offering ${offer}. Reply to this email or book online to claim it.\n\nThanks,\nThe ${b.name} team\n\n[Business name, postal address]\n[Unsubscribe link]` },
+          { subject: `Last chance: ${offer}`, previewText: "Ends this week", body: `Hi [first name],\n\nJust a reminder that ${offer} ends soon. Book now: [link]\n\nThe ${b.name} team\n\n[Business name, postal address]\n[Unsubscribe link]` },
         ]
       : [],
     landingPage: {
       headline: `${offer.charAt(0).toUpperCase() + offer.slice(1)} from ${b.name}`,
       subheadline: b.description.slice(0, 160),
-      bullets: ["Trusted by local customers", "Fast, friendly service", "No-pressure consultation"],
+      bullets: ["[Your top reason customers choose you]", "[What's included in the offer]", "No-pressure consultation"],
       cta: `Claim ${offer}`,
     },
     kpis: [
       { metric: "Leads", target: "25+" },
       { metric: "Cost per lead", target: brief.budget ? `$${Math.max(10, Math.round(brief.budget / 25))}` : "n/a" },
       { metric: "Landing page conversion", target: "8%+" },
+    ],
+    complianceNotes: [
+      "Fill in every [bracketed] placeholder before publishing.",
+      "Make sure the offer, its end date and any limits are real and stated the same way everywhere.",
+      "Marketing emails need your postal address and a working unsubscribe link.",
     ],
   };
 }

@@ -17,7 +17,7 @@ export function GeneratePlanForm({ label, subtle }: { label: string; subtle?: bo
       }}
     >
       <FormMessage state={state} />
-      <SubmitButton className={subtle ? "btn btn-ghost" : "btn btn-primary btn-lg"} pendingText="Building your plan... (about a minute)">
+      <SubmitButton className={subtle ? "btn btn-ghost" : "btn btn-primary btn-lg"} pendingText="Building your plan… (about a minute)">
         {label}
       </SubmitButton>
     </form>

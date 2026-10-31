@@ -32,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </form>
         </div>
       </aside>
-      <main className="main">{children}</main>
+      <main className="main" id="main">{children}</main>
     </div>
   );
 }

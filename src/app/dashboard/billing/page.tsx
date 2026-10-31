@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { stripeEnabled } from "@/lib/stripe";
 import { AD_SPEND_NOTE, PAID_TIERS, TIERS } from "@/lib/tiers";
@@ -44,6 +45,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </div>
 
       <p className="ad-spend-note" style={{ marginBottom: 16 }}>{AD_SPEND_NOTE}</p>
+      <p className="small muted" style={{ marginBottom: 16 }}>
+        Paid plans renew automatically each month at the price shown until you cancel. Cancel anytime from &ldquo;Manage
+        subscription&rdquo;; it takes effect at the end of your billing period. See our <Link href="/terms">Terms of Service</Link>.
+      </p>
       <div className="grid grid-3">
         {PAID_TIERS.map((t) => (
           <div className={`card ${t.id === user.tier ? "featured" : ""}`} key={t.id}>
