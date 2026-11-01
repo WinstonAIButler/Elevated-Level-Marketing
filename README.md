@@ -48,6 +48,18 @@ Other scripts: `npm test` (unit tests), `npm run lint` (type check), `npm run bu
 
 **Setup check:** open `/api/health` on the live site. It reports whether the database, login secret, AI key, payments and autopilot are configured, without showing any values.
 
+## Jarvis
+
+`/jarvis` is Elevated Level Marketing's operations chief of staff: live Stripe revenue (balance, last 30 days, monthly recurring, open and overdue invoices), dev status from GitHub (open pull requests, latest deploys, recent commits), and a Claude-written briefing with today's priorities and sales and marketing moves. You can also ask it questions. It only reads: it can't move money, merge code or email anyone. It's not linked from the site and isn't indexed.
+
+The page is `public/jarvis.html` (served at `/jarvis` by a rewrite in `next.config.mjs`), the API is `src/app/api/jarvis/route.ts`, and the engine is `src/lib/jarvis/jarvis-core.js`, an identical copy in every Joslin Enterprises repo, so change it there and copy it across. Environment variables:
+
+- `JARVIS_ACCESS_CODE` (required): the passphrase the page asks for. Jarvis stays locked until it's set.
+- `ANTHROPIC_API_KEY`: Claude, for briefings and questions (the same key the app already uses).
+- `JARVIS_STRIPE_KEY`: a restricted Stripe key with Read on Balance, Charges, Subscriptions and Invoices. Without it, Jarvis reads with `STRIPE_SECRET_KEY`.
+- `GITHUB_TOKEN`: a fine-grained token with read-only Contents, Pull requests and Deployments on this repo.
+- `JARVIS_MODEL` (optional): default `claude-sonnet-5-5`.
+
 ## Logo files
 
 `public/brand/` holds the cleaned-up logo, rebuilt as vectors from the original artwork (green/gray arrow mark, ELEVATED / DIGITAL MARKETING wordmark set in Inter):
