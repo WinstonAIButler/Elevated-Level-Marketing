@@ -54,7 +54,7 @@ Other scripts: `npm test` (unit tests), `npm run lint` (type check), `npm run bu
 
 The page is `public/jarvis.html` (served at `/jarvis` by a rewrite in `next.config.mjs`), the API is `src/app/api/jarvis/route.ts`, and the engine is `src/lib/jarvis/jarvis-core.js`, an identical copy in every Joslin Enterprises repo, so change it there and copy it across. Environment variables:
 
-- `JARVIS_ACCESS_CODE` (required): the passphrase the page asks for. Jarvis stays locked until it's set.
+- `JARVIS_ACCESS_CODE` (optional): leave it empty and Jarvis opens for anyone with the link; set it to require a passphrase.
 - `ANTHROPIC_API_KEY`: Claude, for briefings and questions (the same key the app already uses).
 - `JARVIS_STRIPE_KEY`: a restricted Stripe key with Read on Balance, Charges, Subscriptions and Invoices. Without it, Jarvis reads with `STRIPE_SECRET_KEY`.
 - `GITHUB_TOKEN`: a fine-grained token with read-only Contents, Pull requests and Deployments on this repo.
