@@ -113,3 +113,65 @@ export function managedAdsConfigured(p: Provider, env: Record<string, string | u
   if (p === "GOOGLE_ADS") return Boolean(env.GOOGLE_ADS_DEVELOPER_TOKEN && env.GOOGLE_ADS_LOGIN_CUSTOMER_ID && env.GOOGLE_ADS_MANAGED_CUSTOMER_ID && env.GOOGLE_ADS_REFRESH_TOKEN && env.GOOGLE_CLIENT_ID);
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// Linking an account by hand (before one-click sign-in is available, or instead of it)
+
+export type LinkField = { label: string; placeholder: string; hint?: string };
+
+export const LINK_FIELDS: Record<Provider, { account: LinkField; extra?: LinkField }> = {
+  META: {
+    account: { label: "Facebook Page link", placeholder: "https://facebook.com/yourbusiness" },
+    extra: { label: "Instagram handle (optional)", placeholder: "@yourbusiness" },
+  },
+  GOOGLE_BUSINESS: {
+    account: {
+      label: "Google Business Profile link or business name and address",
+      placeholder: "https://maps.app.goo.gl/… or Sunrise Coffee, 123 Main St, Tampa",
+    },
+  },
+  GOOGLE_ADS: {
+    account: { label: "Google Ads customer ID", placeholder: "123-456-7890", hint: "Top right corner of Google Ads, next to your account name." },
+  },
+  LINKEDIN: { account: { label: "LinkedIn company page link", placeholder: "https://linkedin.com/company/yourbusiness" } },
+  TIKTOK: { account: { label: "TikTok handle", placeholder: "@yourbusiness" } },
+  X: { account: { label: "X (Twitter) handle", placeholder: "@yourbusiness" } },
+};
+
+/** Steps for giving Elevated access to an account the client links by hand. */
+export function accessSteps(p: Provider, env: Record<string, string | undefined> = process.env): string[] {
+  const email = env.ELEVATED_ACCESS_EMAIL || env.CONTACT_EMAIL || "support@elevatedlevel.app";
+  const metaBusiness = env.ELEVATED_META_BUSINESS_ID;
+  const mcc = env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
+  switch (p) {
+    case "META":
+      return metaBusiness
+        ? [
+            "Open Meta Business Suite → Settings → Accounts → Pages, and choose your Page.",
+            `Click "Assign partner", enter Elevated's Business ID ${metaBusiness} and allow content and ads access.`,
+            "Do the same under Instagram accounts if you have one.",
+          ]
+        : ["Add your Page below. We'll send a partner request from Elevated's Meta Business account for you to approve."];
+    case "GOOGLE_BUSINESS":
+      return [
+        "Open your Business Profile on Google (search your business name while signed in).",
+        `Choose ⋮ → Business Profile settings → Managers → Add, and invite ${email} as a Manager.`,
+      ];
+    case "GOOGLE_ADS":
+      return [
+        mcc
+          ? `We'll send a link request from Elevated's manager account (${mcc}).`
+          : "We'll send a link request from Elevated's Google Ads manager account.",
+        "Approve it in Google Ads under Admin → Access and security → Managers.",
+      ];
+    case "LINKEDIN":
+      return ["Add your page below. We'll email you the Elevated profile to add as a Content admin (Page admin tools → Manage admins)."];
+    case "TIKTOK":
+      return ["Add your handle below. We'll send a TikTok Business Center partner request for you to approve."];
+    case "X":
+      return ["Add your handle below. We'll contact you to set up posting access."];
+  }
+}
+
+/** Connection statuses that count as "set up" for queueing content. */
+export const USABLE_STATUSES = ["active", "linked"];

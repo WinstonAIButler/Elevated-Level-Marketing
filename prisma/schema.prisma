@@ -48,36 +48,42 @@ model User {
 }
 
 model Business {
-  id                 String              @id @default(cuid())
-  userId             String              @unique
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name               String
-  industry           String
-  website            String?
-  location           String?
-  description        String
-  targetAudience     String
-  goals              String
-  brandVoice         String?
-  competitors        String?
-  monthlyBudget      Int                 @default(0)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  assessments        Assessment[]
-  plans              MarketingPlan[]
-  campaigns          Campaign[]
-  activity           Activity[]
-  websiteAudits      WebsiteAudit[]
+  id                     String              @id @default(cuid())
+  userId                 String              @unique
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                   String
+  industry               String
+  website                String?
+  location               String?
+  description            String
+  targetAudience         String
+  goals                  String
+  brandVoice             String?
+  competitors            String?
+  monthlyBudget          Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  assessments            Assessment[]
+  plans                  MarketingPlan[]
+  campaigns              Campaign[]
+  activity               Activity[]
+  websiteAudits          WebsiteAudit[]
   // Ad spend: WALLET = client prepays, Elevated runs ads from its managed accounts;
   // OWN_ACCOUNTS = client connects their own ad accounts and the platforms bill them.
-  adSpendMode        AdSpendMode         @default(WALLET)
-  walletBalanceCents Int                 @default(0)
-  walletEntries      WalletEntry[]
-  connections        ChannelConnection[]
-  allocations        BudgetAllocation[]
-  publishItems       PublishItem[]
-  channelMetrics     ChannelMetric[]
-  mediaAssets        MediaAsset[]
+  adSpendMode            AdSpendMode         @default(WALLET)
+  walletBalanceCents     Int                 @default(0)
+  walletEntries          WalletEntry[]
+  connections            ChannelConnection[]
+  allocations            BudgetAllocation[]
+  publishItems           PublishItem[]
+  channelMetrics         ChannelMetric[]
+  mediaAssets            MediaAsset[]
+  // The client's own Stripe account, created under Elevated's Connect platform. The client
+  // owns it (full Stripe Dashboard); Elevated can read it to report sales from marketing.
+  stripeAccountId        String?             @unique
+  stripeDetailsSubmitted Boolean             @default(false)
+  stripeChargesEnabled   Boolean             @default(false)
+  stripeCheckedAt        DateTime?
 }
 
 model Assessment {
@@ -241,7 +247,9 @@ model WalletEntry {
   @@index([businessId, createdAt])
 }
 
-// A client's connected account on one platform. Tokens are AES-256-GCM encrypted (src/lib/crypto.ts).
+// A client's account on one platform. Either connected with one-click sign-in (method "oauth",
+// tokens AES-256-GCM encrypted, see src/lib/crypto.ts) or linked by hand (method "manual": the
+// client entered the account and gave Elevated access; the team publishes until sign-in exists).
 model ChannelConnection {
   id              String    @id @default(cuid())
   businessId      String
@@ -251,11 +259,13 @@ model ChannelConnection {
   accountName     String?
   adAccountId     String? // client's own ad account (OWN_ACCOUNTS mode)
   extra           Json? // provider specifics, e.g. Instagram business account id
-  accessTokenEnc  String
+  method          String    @default("oauth") // oauth | manual
+  profileUrl      String? // page / profile link or handle the client entered
+  accessTokenEnc  String?
   refreshTokenEnc String?
   expiresAt       DateTime?
   scopes          String?
-  status          String    @default("active") // active | expired | error
+  status          String    @default("active") // active | linked (manual) | expired | error
   lastError       String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

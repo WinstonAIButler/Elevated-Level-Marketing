@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/dashboard/channels", label: "Channels" },
   { href: "/dashboard/website", label: "Website & AI visibility" },
   { href: "/dashboard/billing", label: "Billing" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export function NavLinks() {

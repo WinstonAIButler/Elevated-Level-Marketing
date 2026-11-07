@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -84,9 +85,11 @@ export async function retryItem(form: FormData) {
 export async function sendCampaignToQueue(form: FormData) {
   const { business } = await requireBusiness();
   const campaign = await db.campaign.findFirst({ where: { id: String(form.get("id")), businessId: business.id } });
-  if (campaign) await queueCampaignPosts(business, campaign);
-  revalidatePath(`/dashboard/campaigns/${campaign?.id}`);
+  if (!campaign) return;
+  const queued = await queueCampaignPosts(business, campaign);
+  revalidatePath(`/dashboard/campaigns/${campaign.id}`);
   refresh();
+  redirect(`/dashboard/campaigns/${campaign.id}?queued=${queued}`);
 }
 
 export async function createImage(_: ActionState, form: FormData): Promise<ActionState> {
