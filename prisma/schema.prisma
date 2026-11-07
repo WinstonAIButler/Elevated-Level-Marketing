@@ -48,26 +48,36 @@ model User {
 }
 
 model Business {
-  id             String          @id @default(cuid())
-  userId         String          @unique
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name           String
-  industry       String
-  website        String?
-  location       String?
-  description    String
-  targetAudience String
-  goals          String
-  brandVoice     String?
-  competitors    String?
-  monthlyBudget  Int             @default(0)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  assessments    Assessment[]
-  plans          MarketingPlan[]
-  campaigns      Campaign[]
-  activity       Activity[]
-  websiteAudits  WebsiteAudit[]
+  id                 String              @id @default(cuid())
+  userId             String              @unique
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  industry           String
+  website            String?
+  location           String?
+  description        String
+  targetAudience     String
+  goals              String
+  brandVoice         String?
+  competitors        String?
+  monthlyBudget      Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  assessments        Assessment[]
+  plans              MarketingPlan[]
+  campaigns          Campaign[]
+  activity           Activity[]
+  websiteAudits      WebsiteAudit[]
+  // Ad spend: WALLET = client prepays, Elevated runs ads from its managed accounts;
+  // OWN_ACCOUNTS = client connects their own ad accounts and the platforms bill them.
+  adSpendMode        AdSpendMode         @default(WALLET)
+  walletBalanceCents Int                 @default(0)
+  walletEntries      WalletEntry[]
+  connections        ChannelConnection[]
+  allocations        BudgetAllocation[]
+  publishItems       PublishItem[]
+  channelMetrics     ChannelMetric[]
+  mediaAssets        MediaAsset[]
 }
 
 model Assessment {
@@ -162,6 +172,170 @@ model WebsiteAudit {
   score      Int
   checks     Json
   createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Ad spend, channel connections, budget allocation and the approval queue
+
+enum AdSpendMode {
+  WALLET
+  OWN_ACCOUNTS
+}
+
+enum Provider {
+  META
+  GOOGLE_ADS
+  GOOGLE_BUSINESS
+  LINKEDIN
+  TIKTOK
+  X
+}
+
+enum WalletEntryKind {
+  TOPUP
+  SPEND
+  REFUND
+  ADJUSTMENT
+}
+
+enum AllocationStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum PublishKind {
+  POST
+  AD
+}
+
+enum PublishStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHING
+  PUBLISHED
+  PAUSED
+  FAILED
+  NEEDS_TEAM
+}
+
+// Ledger for the prepaid ad-spend wallet. Business.walletBalanceCents is the running
+// total, always changed in the same transaction as the entry that moves it.
+model WalletEntry {
+  id          String          @id @default(cuid())
+  businessId  String
+  business    Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  kind        WalletEntryKind
+  amountCents Int // positive credits the wallet, negative debits it
+  provider    Provider?
+  // Idempotency key: Stripe checkout session id for top-ups, "spend:<provider>:<yyyy-mm-dd>" for spend.
+  reference   String?
+  note        String
+  createdAt   DateTime        @default(now())
+
+  @@unique([businessId, reference])
+  @@index([businessId, createdAt])
+}
+
+// A client's connected account on one platform. Tokens are AES-256-GCM encrypted (src/lib/crypto.ts).
+model ChannelConnection {
+  id              String    @id @default(cuid())
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  provider        Provider
+  accountId       String? // page id / location name / ad account id / org URN
+  accountName     String?
+  adAccountId     String? // client's own ad account (OWN_ACCOUNTS mode)
+  extra           Json? // provider specifics, e.g. Instagram business account id
+  accessTokenEnc  String
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  scopes          String?
+  status          String    @default("active") // active | expired | error
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([businessId, provider])
+}
+
+// A proposed split of the client's monthly ad budget across channels, with the reason
+// for each channel. Nothing is spent until the client approves it.
+model BudgetAllocation {
+  id          String           @id @default(cuid())
+  businessId  String
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  month       DateTime // first day of the month it covers
+  totalCents  Int
+  summary     String
+  splits      Json // [{ provider, channel, percent, cents, reason, expectedResult }]
+  basedOn     Json? // performance numbers the proposal used
+  status      AllocationStatus @default(PROPOSED)
+  clientNote  String?
+  decidedAt   DateTime?
+  aiGenerated Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+// One post or ad waiting for approval, scheduled, or already published.
+model PublishItem {
+  id               String        @id @default(cuid())
+  businessId       String
+  business         Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId       String?
+  allocationId     String?
+  provider         Provider
+  kind             PublishKind
+  title            String
+  payload          Json // caption, hashtags, imageUrl, link, ad headlines/descriptions, keywords...
+  dailyBudgetCents Int           @default(0)
+  scheduledFor     DateTime
+  status           PublishStatus @default(PENDING_APPROVAL)
+  externalId       String? // id on the platform (post id, campaign id)
+  externalUrl      String?
+  error            String?
+  attempts         Int           @default(0)
+  decidedAt        DateTime?
+  publishedAt      DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@index([businessId, status])
+  @@index([status, scheduledFor])
+}
+
+// Daily results per channel, pulled from the platforms. Drives spend tracking and
+// the next budget allocation.
+model ChannelMetric {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  provider    Provider
+  date        DateTime @db.Date
+  spendCents  Int      @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Float    @default(0)
+
+  @@unique([businessId, provider, date])
+}
+
+// AI-generated images for posts and ads, served publicly at /api/media/<id> so the
+// platforms (Instagram, Meta ads, Google Business Profile) can fetch them.
+model MediaAsset {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contentType String
+  data        Bytes
+  prompt      String
+  source      String // openai | gemini
+  createdAt   DateTime @default(now())
 
   @@index([businessId, createdAt])
 }

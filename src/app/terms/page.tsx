@@ -46,8 +46,12 @@ export default function TermsPage() {
         </li>
         <li>We will give you notice before any price change takes effect, and you can cancel before it applies.</li>
         <li>
-          <strong>Ad spend is not included.</strong> You pay advertising platforms (such as Google or Meta) directly for any ads
-          you run, and you control that budget.
+          <strong>Ad spend is not included.</strong> You set your ad budget and approve how it is split before anything is
+          spent. You either connect your own ad accounts, in which case the advertising platforms (such as Google or Meta)
+          bill you directly, or prepay ad spend into your Elevated ad wallet, in which case we buy the ads on your behalf from
+          our ad accounts and deduct the platforms&apos; actual charges from your wallet. Wallet top-ups include the management
+          fee shown at checkout. Ads pause automatically when your wallet balance runs low. Contact us about any unused
+          wallet balance.
         </li>
       </ul>
 

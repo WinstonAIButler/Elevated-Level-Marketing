@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { aiEnabled } from "@/lib/ai";
 import { currentPlanWeek, formatDate } from "@/lib/format";
 import { TIERS } from "@/lib/tiers";
+import { CHANNELS } from "@/lib/channels";
 import { usageThisMonth } from "@/lib/usage";
 import { runAutopilotNow, toggleAutopilot } from "@/app/actions/account";
 import { ScoreRing } from "@/components/Score";
@@ -25,12 +26,16 @@ export default async function Overview() {
     );
   }
 
-  const [assessment, plan, campaigns, activity, usage] = await Promise.all([
+  const [assessment, plan, campaigns, activity, usage, pendingCount, liveAds, connections, allocation] = await Promise.all([
     db.assessment.findFirst({ where: { businessId: business.id }, orderBy: { createdAt: "desc" } }),
     db.marketingPlan.findFirst({ where: { businessId: business.id, active: true }, include: { tasks: true } }),
     db.campaign.findMany({ where: { businessId: business.id }, orderBy: { createdAt: "desc" }, take: 5 }),
     db.activity.findMany({ where: { businessId: business.id }, orderBy: { createdAt: "desc" }, take: 8 }),
     usageThisMonth(business.id),
+    db.publishItem.count({ where: { businessId: business.id, status: "PENDING_APPROVAL" } }),
+    db.publishItem.count({ where: { businessId: business.id, kind: "AD", status: "PUBLISHED" } }),
+    db.channelConnection.findMany({ where: { businessId: business.id, status: "active" }, select: { provider: true } }),
+    db.budgetAllocation.findFirst({ where: { businessId: business.id, status: { in: ["PROPOSED", "APPROVED"] } }, orderBy: { createdAt: "desc" } }),
   ]);
 
   const done = plan?.tasks.filter((t) => t.status === "DONE").length ?? 0;
@@ -63,6 +68,36 @@ export default async function Overview() {
         </div>
       )}
 
+      {pendingCount > 0 && (
+        <div className="alert alert-info" style={{ marginBottom: 20 }}>
+          <strong>{pendingCount} item{pendingCount === 1 ? " is" : "s are"} waiting for your approval.</strong>{" "}
+          <Link href="/dashboard/approvals">Review now →</Link>
+        </div>
+      )}
+
+      <div className="grid grid-4" style={{ marginBottom: 20 }}>
+        <div className="card">
+          <div className="muted small">Waiting for approval</div>
+          <div className="stat">{pendingCount}</div>
+          <div className="muted small"><Link href="/dashboard/approvals">{pendingCount ? "Review posts and ads" : "Nothing to review"}</Link></div>
+        </div>
+        <div className="card">
+          <div className="muted small">{business.adSpendMode === "WALLET" ? "Ad wallet" : "Monthly ad budget"}</div>
+          <div className="stat">${business.adSpendMode === "WALLET" ? (business.walletBalanceCents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 }) : business.monthlyBudget.toLocaleString()}</div>
+          <div className="muted small"><Link href="/dashboard/ad-spend">{liveAds} ad campaign{liveAds === 1 ? "" : "s"} live</Link></div>
+        </div>
+        <div className="card">
+          <div className="muted small">Budget split</div>
+          <div className="stat" style={{ fontSize: "1.1rem", marginTop: 8 }}>{allocation ? (allocation.status === "APPROVED" ? "Approved" : "Needs your OK") : "Not set"}</div>
+          <div className="muted small"><Link href="/dashboard/ad-spend">See where it goes</Link></div>
+        </div>
+        <div className="card">
+          <div className="muted small">Connected channels</div>
+          <div className="stat">{connections.length}<small className="muted"> / {Object.keys(CHANNELS).length}</small></div>
+          <div className="muted small"><Link href="/dashboard/channels">{connections.length ? connections.map((c) => CHANNELS[c.provider].name).join(", ") : "Connect accounts"}</Link></div>
+        </div>
+      </div>
+
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card">
           <div className="muted small">Marketing score</div>
@@ -83,7 +118,7 @@ export default async function Overview() {
         <div className="card">
           <div className="muted small">Campaigns this month</div>
           <div className="stat">{usage.campaigns}</div>
-          <div className="muted small">of {limits.campaignsPerMonth >= 1000 ? "unlimited" : limits.campaignsPerMonth} on {TIERS[user.tier].name}</div>
+          <div className="muted small">of {limits.campaignsPerMonth} on {TIERS[user.tier].name}</div>
         </div>
         <div className="card">
           <div className="muted small">Waiting on you</div>
@@ -99,8 +134,9 @@ export default async function Overview() {
             <span className={`badge ${user.autopilot ? "badge-good" : ""}`}>{user.autopilot ? "On" : "Off"}</span>
           </div>
           <p className="muted small" style={{ marginTop: 10 }}>
-            Every Monday, autopilot drafts a fresh content batch from your plan, starts this week&apos;s automated tasks and
-            flags anything waiting on you.{user.tier === "TRIAL" && " Weekly runs are included with paid plans; you can still run it manually."}
+            Every Monday, autopilot writes a fresh content batch from your plan and sends it to Approvals, proposes your
+            monthly ad budget split, starts this week&apos;s automated tasks and flags anything waiting on you. Approved
+            posts and ads publish to your connected channels automatically.{user.tier === "TRIAL" && " Weekly runs are included with paid plans; you can still run it manually."}
           </p>
           <div className="row">
             <form action={toggleAutopilot}>

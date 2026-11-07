@@ -10,7 +10,7 @@ export const metadata = { title: "Billing" };
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string }> }) {
   const user = await requireUser();
   const { success, error } = await searchParams;
-  const usage = user.business ? await usageThisMonth(user.business.id) : { assessments: 0, plans: 0, campaigns: 0 };
+  const usage = user.business ? await usageThisMonth(user.business.id) : { assessments: 0, plans: 0, campaigns: 0, images: 0 };
   const current = TIERS[user.tier];
   const payments = stripeEnabled();
 
@@ -39,7 +39,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <tbody>
             <tr><td>Assessments</td><td>{usage.assessments} / {current.limits.assessmentsPerMonth}</td></tr>
             <tr><td>Marketing plans</td><td>{usage.plans} / {current.limits.plansPerMonth}</td></tr>
-            <tr><td>Campaigns</td><td>{usage.campaigns} / {current.limits.campaignsPerMonth >= 1000 ? "unlimited" : current.limits.campaignsPerMonth}</td></tr>
+            <tr><td>AI images</td><td>{usage.images} / {current.limits.imagesPerMonth}</td></tr>
+            <tr><td>Campaigns</td><td>{usage.campaigns} / {current.limits.campaignsPerMonth}</td></tr>
           </tbody>
         </table>
       </div>
@@ -54,7 +55,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <div className={`card ${t.id === user.tier ? "featured" : ""}`} key={t.id}>
             <h3>{t.name}</h3>
             <div className="price">${t.price}<small>/month</small></div>
-            <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ your own ad spend</p>
+            <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ ad spend, at the budget you set</p>
             <ul className="feature-list">{t.features.map((f) => <li key={f}>{f}</li>)}</ul>
             {t.id === user.tier ? (
               <span className="badge badge-good">Current plan</span>

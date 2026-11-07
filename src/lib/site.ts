@@ -19,7 +19,7 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How much does it cost?",
-    a: `There is a free trial with no card required. Paid plans are ${PAID_TIERS.map((t) => `${t.name} at $${t.price}`).join(", ")} per month. Plan prices do not include ad spend: you pay Google, Meta and other ad platforms directly for any ads you choose to run.`,
+    a: `There is a free trial with no card required. Paid plans are ${PAID_TIERS.map((t) => `${t.name} at $${t.price}`).join(", ")} per month. Plan prices do not include ad spend: you set your ad budget, approve how it is split across channels, and either prepay it into your Elevated ad wallet or connect your own Google and Meta ad accounts.`,
   },
   {
     q: "Who is it for?",

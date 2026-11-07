@@ -6,6 +6,7 @@ import { requireBusiness } from "@/lib/auth";
 import { addDays, formatDate } from "@/lib/format";
 import type { CampaignOutput } from "@/lib/ai";
 import { deleteCampaign, setCampaignStatus } from "@/app/actions/campaigns";
+import { sendCampaignToQueue } from "@/app/actions/approvals";
 import { CopyButton } from "@/components/CopyButton";
 
 export const metadata = { title: "Campaign" };
@@ -28,6 +29,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   if (!c) notFound();
   const content = c.content as CampaignOutput;
   const nextStatus = FLOW[FLOW.indexOf(c.status) + 1];
+  const queued = await db.publishItem.count({ where: { campaignId: c.id, kind: "POST" } });
 
   return (
     <>
@@ -47,6 +49,14 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
               <input type="hidden" name="campaignId" value={c.id} />
               <input type="hidden" name="status" value={nextStatus} />
               <button className="btn btn-primary btn-sm">Mark {nextStatus.toLowerCase()}</button>
+            </form>
+          )}
+          {queued ? (
+            <Link href="/dashboard/approvals" className="btn btn-ghost btn-sm">{queued} post{queued === 1 ? "" : "s"} in Approvals</Link>
+          ) : (
+            <form action={sendCampaignToQueue}>
+              <input type="hidden" name="id" value={c.id} />
+              <button className="btn btn-primary btn-sm">Send posts to my channels</button>
             </form>
           )}
           <form action={deleteCampaign}>
