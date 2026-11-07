@@ -44,13 +44,18 @@ export default async function Overview() {
   const waiting = plan?.tasks.filter((t) => t.owner === "CLIENT" && t.status !== "DONE" && t.week <= week) ?? [];
   const limits = TIERS[user.tier].limits;
 
-  const next = !assessment
-    ? { href: "/dashboard/assessment", label: "Take your marketing assessment" }
-    : !plan
-      ? { href: "/dashboard/plan", label: "Generate your marketing plan" }
-      : campaigns.length === 0
-        ? { href: "/dashboard/campaigns/new", label: "Create your first campaign" }
-        : null;
+  // Onboarding checklist, in the order a new client should do things.
+  const steps = [
+    { done: true, href: "/dashboard/business", label: "Tell us about your business" },
+    { done: Boolean(assessment), href: "/dashboard/assessment", label: "Take your marketing assessment" },
+    { done: Boolean(plan), href: "/dashboard/plan", label: "Get your 12-week marketing plan" },
+    { done: connections.length > 0, href: "/dashboard/channels", label: "Add your social and Google accounts" },
+    { done: business.stripeChargesEnabled, href: "/dashboard/settings#stripe", label: business.stripeAccountId ? "Finish setting up your Stripe account" : "Set up your Stripe account" },
+    { done: Boolean(allocation), href: "/dashboard/ad-spend", label: "Set your ad budget" },
+    { done: campaigns.length > 0, href: "/dashboard/campaigns/new", label: "Create your first campaign" },
+  ];
+  const todo = steps.filter((s) => !s.done);
+  const next = todo[0] ?? null;
 
   return (
     <>
@@ -65,6 +70,22 @@ export default async function Overview() {
       {!aiEnabled() && (
         <div className="alert alert-info" style={{ marginBottom: 20 }}>
           Demo mode: no Claude API key is configured, so assessments, plans and campaigns use template content.
+        </div>
+      )}
+
+      {todo.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="row between">
+            <h2 style={{ margin: 0 }}>Getting started</h2>
+            <span className="muted small">{steps.length - todo.length} of {steps.length} done</span>
+          </div>
+          <ol className="checklist">
+            {steps.map((s) => (
+              <li key={s.label} className={s.done ? "done" : ""}>
+                {s.done ? <span>{s.label}</span> : <Link href={s.href}>{s.label}</Link>}
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
