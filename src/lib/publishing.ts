@@ -3,7 +3,7 @@ import type { Business, Campaign, Prisma, PublishItem, Provider } from "@prisma/
 import { db } from "./db";
 import { adCreative, budgetAllocation, type CampaignOutput } from "./ai";
 import { dailyBudgetCents, looksB2B, maxChannels, normalizeSplits, proposeSplit, startOfMonth, type Split } from "./allocation";
-import { CHANNELS, PAID_PROVIDERS, managedAdsConfigured, providerForPlatform } from "./channels";
+import { CHANNELS, PAID_PROVIDERS, USABLE_STATUSES, managedAdsConfigured, providerForPlatform } from "./channels";
 import { addDays } from "./format";
 import { logActivity } from "./usage";
 import { recordWalletEntry } from "./wallet";
@@ -147,7 +147,7 @@ function normalizeUrl(url: string) {
 export async function queueCampaignPosts(business: Business, campaign: Campaign) {
   const content = campaign.content as CampaignOutput;
   const connected = new Set(
-    (await db.channelConnection.findMany({ where: { businessId: business.id, status: "active" }, select: { provider: true } })).map((c) => c.provider),
+    (await db.channelConnection.findMany({ where: { businessId: business.id, status: { in: USABLE_STATUSES } }, select: { provider: true } })).map((c) => c.provider),
   );
   const already = await db.publishItem.count({ where: { campaignId: campaign.id, kind: "POST" } });
   if (already) return 0;
@@ -223,6 +223,11 @@ export async function publishItem(itemId: string) {
   const info = CHANNELS[item.provider];
   const publisher = PUBLISHERS[item.provider];
 
+  const linkedByHand = async () =>
+    (await db.channelConnection.count({ where: { businessId: business.id, provider: item.provider, method: "manual", status: "linked" } })) > 0;
+  const notConnected = async (fallback: string) =>
+    (await linkedByHand()) ? `the Elevated team publishes to your linked ${info.name} account` : fallback;
+
   const toTeam = async (why: string) => {
     await db.publishItem.update({ where: { id: item.id }, data: { status: "NEEDS_TEAM", error: why } });
     await logActivity(business.id, "publishing", `${item.title}: handed to the Elevated team (${why})`);
@@ -232,7 +237,7 @@ export async function publishItem(itemId: string) {
     if (item.kind === "POST") {
       if (!info.autoPosts || !publisher.publishPost) return toTeam(info.manualNote ?? "this platform isn't automated yet");
       const conn = await liveConnection(business.id, item.provider);
-      if (!conn) return toTeam(`${info.name} isn't connected`);
+      if (!conn) return toTeam(await notConnected(`${info.name} isn't connected`));
       const res = await publisher.publishPost(conn, item.payload as PostPayload);
       await markPublished(item, res);
       return;
@@ -253,7 +258,8 @@ export async function publishItem(itemId: string) {
       }
     }
     const conn = await liveConnection(business.id, item.provider);
-    if (item.provider === "META" && !conn) return toTeam("connect the Facebook Page the ads should run under");
+    if (item.provider === "META" && !conn) return toTeam(await notConnected("connect the Facebook Page the ads should run under"));
+    if (!target.managed && !conn) return toTeam(await notConnected(`${info.name} isn't connected`));
     const res = await publisher.launchAd(conn, item.payload as AdPayload, item.dailyBudgetCents, target);
     await db.publishItem.update({
       where: { id: item.id },

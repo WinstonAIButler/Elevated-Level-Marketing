@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { signup } from "@/app/actions/auth";
 import { FormMessage } from "@/components/FormMessage";
 import { SubmitButton } from "@/components/SubmitButton";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function SignupForm() {
   const [state, action] = useActionState(signup, undefined);
@@ -20,7 +21,7 @@ export function SignupForm() {
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>
-        <input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
+        <PasswordInput autoComplete="new-password" minLength={8} />
         <span className="hint">At least 8 characters.</span>
       </div>
       <SubmitButton pendingText="Creating account…">Create account</SubmitButton>

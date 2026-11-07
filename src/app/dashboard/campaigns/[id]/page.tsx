@@ -22,8 +22,9 @@ function Copy({ text }: { text: string }) {
   );
 }
 
-export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ queued?: string }> }) {
   const { id } = await params;
+  const { queued: queuedParam } = await searchParams;
   const { business } = await requireBusiness();
   const c = await db.campaign.findFirst({ where: { id, businessId: business.id } });
   if (!c) notFound();
@@ -65,6 +66,18 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           </form>
         </div>
       </div>
+
+      {queuedParam === "0" && (
+        <div className="alert alert-info" style={{ marginBottom: 20 }}>
+          No posts were sent: none of this campaign&apos;s platforms are set up yet. Add your accounts on the{" "}
+          <Link href="/dashboard/channels">Channels</Link> page, then try again.
+        </div>
+      )}
+      {queuedParam && queuedParam !== "0" && (
+        <div className="alert alert-ok" style={{ marginBottom: 20 }}>
+          {queuedParam} post{queuedParam === "1" ? "" : "s"} sent to <Link href="/dashboard/approvals">Approvals</Link> for your OK.
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2>Big idea</h2>
