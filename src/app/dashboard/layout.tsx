@@ -1,4 +1,5 @@
-import { requireUser } from "@/lib/auth";
+import { isOwner, requireUser } from "@/lib/auth";
+import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
 import { NavLinks } from "@/components/NavLinks";
@@ -14,6 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <aside className="sidebar">
         <Logo href="/dashboard" />
         <NavLinks />
+        {isOwner(user) && <Link href="/hub" className="nav" style={{ marginTop: 8, color: "var(--green)" }}>Owners Hub →</Link>}
         <div className="spacer" />
         <div className="account">
           <div>
