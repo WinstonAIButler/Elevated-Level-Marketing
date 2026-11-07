@@ -30,16 +30,36 @@ Compliance rules for everything you write (the client publishes it under their n
 - Influencer or partner posts must include a clear #ad or "Paid partnership" disclosure.
 - Respect platform ad policies (Google, Meta, TikTok) and do not mention a person's personal attributes in ad copy ("Are you struggling with debt?").`;
 
+/** Turns API failures into a message clients can read; the details go to the server log. */
+function friendlyAiError(err: unknown): Error {
+  if (err instanceof Anthropic.APIError) {
+    console.error("Claude API error", err.status, err.message);
+    if (err.status === 429 || err.status === 529) return new Error("Our AI is busy right now. Please try again in a minute.");
+    if (err.status === 401 || err.status === 403) return new Error("Our AI service isn't available right now. Please try again later or contact support.");
+    return new Error("Our AI service had a problem. Please try again in a moment.");
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    console.error("Claude connection error", err.message);
+    return new Error("We couldn't reach our AI service. Please try again in a moment.");
+  }
+  return err instanceof Error ? err : new Error("Something went wrong. Please try again.");
+}
+
 async function generate<T extends z.ZodType>(schema: T, prompt: string): Promise<z.infer<T>> {
-  const response = await anthropic().beta.messages.parse({
-    model: MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: betaZodOutputFormat(schema) },
-    system: SYSTEM,
-    messages: [{ role: "user", content: prompt }],
-  });
+  let response;
+  try {
+    response = await anthropic().beta.messages.parse({
+      model: MODEL,
+      max_tokens: 16000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "medium", format: betaZodOutputFormat(schema) },
+      system: SYSTEM,
+      messages: [{ role: "user", content: prompt }],
+    });
+  } catch (err) {
+    throw friendlyAiError(err);
+  }
   if (response.stop_reason === "refusal") {
     throw new Error("The AI declined this request. Try rewording your business details or campaign brief.");
   }

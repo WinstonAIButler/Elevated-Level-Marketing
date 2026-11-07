@@ -20,7 +20,7 @@ export const PUBLISHERS: Record<Provider, Publisher> = {
 /** Loads a connection, refreshing its token first when it's about to expire. */
 export async function liveConnection(businessId: string, provider: Provider): Promise<LiveConnection | null> {
   const conn = await db.channelConnection.findUnique({ where: { businessId_provider: { businessId, provider } } });
-  if (!conn || conn.status !== "active") return null;
+  if (!conn || conn.status !== "active" || !conn.accessTokenEnc) return null;
   return toLive(await refreshIfNeeded(conn));
 }
 
@@ -51,7 +51,7 @@ export function markConnectionBroken(id: string, message: string) {
 function toLive(c: ChannelConnection): LiveConnection {
   return {
     provider: c.provider,
-    accessToken: decrypt(c.accessTokenEnc),
+    accessToken: decrypt(c.accessTokenEnc!),
     accountId: c.accountId,
     accountName: c.accountName,
     adAccountId: c.adAccountId,

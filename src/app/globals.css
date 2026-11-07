@@ -267,3 +267,11 @@ fieldset .option + .option { margin-top: 8px; }
 .password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 36px; padding: 6px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--slate-2); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
 .password-toggle:hover { background: var(--bg); }
 .password-toggle:focus-visible { outline: 2px solid var(--green-strong); outline-offset: 1px; }
+
+/* Channels: link an account by hand */
+.link-form { margin-top: 12px; }
+.steps { margin: 4px 0 0; padding-left: 20px; font-size: 0.88rem; color: var(--slate-2); }
+.steps li + li { margin-top: 4px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 0.9rem; cursor: pointer; }
+.check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--green-strong); flex: none; }
+.channel-card details > summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; margin-top: 8px; }

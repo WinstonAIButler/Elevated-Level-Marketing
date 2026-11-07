@@ -241,7 +241,9 @@ model WalletEntry {
   @@index([businessId, createdAt])
 }
 
-// A client's connected account on one platform. Tokens are AES-256-GCM encrypted (src/lib/crypto.ts).
+// A client's account on one platform. Either connected with one-click sign-in (method "oauth",
+// tokens AES-256-GCM encrypted, see src/lib/crypto.ts) or linked by hand (method "manual": the
+// client entered the account and gave Elevated access; the team publishes until sign-in exists).
 model ChannelConnection {
   id              String    @id @default(cuid())
   businessId      String
@@ -251,11 +253,13 @@ model ChannelConnection {
   accountName     String?
   adAccountId     String? // client's own ad account (OWN_ACCOUNTS mode)
   extra           Json? // provider specifics, e.g. Instagram business account id
-  accessTokenEnc  String
+  method          String    @default("oauth") // oauth | manual
+  profileUrl      String? // page / profile link or handle the client entered
+  accessTokenEnc  String?
   refreshTokenEnc String?
   expiresAt       DateTime?
   scopes          String?
-  status          String    @default("active") // active | expired | error
+  status          String    @default("active") // active | linked (manual) | expired | error
   lastError       String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

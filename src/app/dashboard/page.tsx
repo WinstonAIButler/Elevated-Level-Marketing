@@ -34,7 +34,7 @@ export default async function Overview() {
     usageThisMonth(business.id),
     db.publishItem.count({ where: { businessId: business.id, status: "PENDING_APPROVAL" } }),
     db.publishItem.count({ where: { businessId: business.id, kind: "AD", status: "PUBLISHED" } }),
-    db.channelConnection.findMany({ where: { businessId: business.id, status: "active" }, select: { provider: true } }),
+    db.channelConnection.findMany({ where: { businessId: business.id, status: { in: ["active", "linked"] } }, select: { provider: true } }),
     db.budgetAllocation.findFirst({ where: { businessId: business.id, status: { in: ["PROPOSED", "APPROVED"] } }, orderBy: { createdAt: "desc" } }),
   ]);
 
