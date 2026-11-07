@@ -1,5 +1,5 @@
 # Render Blueprint: one click deploys the website, its Postgres database and
-# the weekly autopilot job. https://render.com/docs/blueprint-spec
+# the weekly autopilot, hourly publisher and ad-spend sync jobs. https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: elevated-web
@@ -31,6 +31,44 @@ services:
     schedule: "0 13 * * 1" # Mondays 13:00 UTC
     buildCommand: "true"
     startCommand: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" "https://$WEB_HOST/api/cron/autopilot"'
+    envVars:
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: elevated-web
+          envVarKey: CRON_SECRET
+      - key: WEB_HOST
+        fromService:
+          type: web
+          name: elevated-web
+          property: host
+
+  - type: cron
+    name: elevated-publisher
+    runtime: node
+    plan: starter
+    schedule: "5 * * * *" # Hourly: publish approved posts/ads
+    buildCommand: "true"
+    startCommand: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" "https://$WEB_HOST/api/cron/publish"'
+    envVars:
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: elevated-web
+          envVarKey: CRON_SECRET
+      - key: WEB_HOST
+        fromService:
+          type: web
+          name: elevated-web
+          property: host
+
+  - type: cron
+    name: elevated-spend-sync
+    runtime: node
+    plan: starter
+    schedule: "30 */4 * * *" # Every 4h: ad spend, wallet debits, low-balance pauses
+    buildCommand: "true"
+    startCommand: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" "https://$WEB_HOST/api/cron/spend-sync"'
     envVars:
       - key: CRON_SECRET
         fromService:

@@ -1,5 +1,8 @@
 import { db } from "@/lib/db";
 import { aiEnabled } from "@/lib/ai";
+import { appConfigured, managedAdsConfigured, PROVIDERS } from "@/lib/channels";
+import { encryptionEnabled } from "@/lib/crypto";
+import { imagesEnabled } from "@/lib/images";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +23,10 @@ export async function GET() {
     ai: aiEnabled() ? `live (${process.env.ANTHROPIC_MODEL || "claude-opus-5-5"})` : "demo mode (add ANTHROPIC_API_KEY)",
     payments: process.env.STRIPE_SECRET_KEY ? "configured" : "off",
     autopilot: process.env.CRON_SECRET ? "ok" : "missing CRON_SECRET",
+    images: imagesEnabled() ? `on (${[process.env.OPENAI_API_KEY && "OpenAI", process.env.GOOGLE_AI_API_KEY && "Gemini"].filter(Boolean).join(" → ")})` : "off (add OPENAI_API_KEY or GOOGLE_AI_API_KEY)",
+    tokenEncryption: encryptionEnabled() ? "ok" : "missing TOKEN_ENCRYPTION_KEY or CONNECTIONS_ENCRYPTION_KEY (needed to connect channels)",
+    channels: Object.fromEntries(PROVIDERS.map((p) => [p, appConfigured(p) ? "app configured" : "no developer app"])),
+    managedAds: { META: managedAdsConfigured("META") ? "ok" : "off", GOOGLE_ADS: managedAdsConfigured("GOOGLE_ADS") ? "ok" : "off" },
   };
   const ready = status.database === "ok" && status.auth === "ok";
   return Response.json({ ready, ...status }, { status: ready ? 200 : 503 });

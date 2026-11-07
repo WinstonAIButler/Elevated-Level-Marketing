@@ -137,7 +137,7 @@ export default function Home() {
                   {t.id === "GROWTH" && <span className="badge badge-good">Most popular</span>}
                   <h3 style={{ marginTop: 8 }}>{t.name}</h3>
                   <div className="price">${t.price}<small>/month</small></div>
-                  <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ your own ad spend</p>
+                  <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ ad spend, at the budget you set</p>
                   <p className="muted small">{t.tagline}</p>
                   <ul className="feature-list">{t.features.map((f) => <li key={f}>{f}</li>)}</ul>
                   <Link href="/signup" className={`btn ${t.id === "GROWTH" ? "btn-primary" : "btn-ghost"}`} style={{ width: "100%" }}>
