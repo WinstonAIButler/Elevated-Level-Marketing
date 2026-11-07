@@ -3,7 +3,7 @@
 // the AI schemas in ai.ts.
 import type { Business } from "@prisma/client";
 import { CATEGORIES, type CategoryId, type CategoryScores, weakestCategories } from "./assessment";
-import type { AssessmentInsight, CampaignBrief, CampaignOutput, PlanOutput } from "./ai";
+import type { AdCreativeOutput, AssessmentInsight, CampaignBrief, CampaignOutput, PlanOutput } from "./ai";
 
 const PLAYBOOK: Record<CategoryId, { fix: string; detail: string; channel: string; tasks: [string, string][] }> = {
   website: {
@@ -213,5 +213,26 @@ export function campaign(b: Business, brief: CampaignBrief): CampaignOutput {
       "Make sure the offer, its end date and any limits are real and stated the same way everywhere.",
       "Marketing emails need your postal address and a working unsubscribe link.",
     ],
+  };
+}
+
+export function adCreative(b: Business, provider: string, source: CampaignOutput | null): AdCreativeOutput {
+  const city = b.location ? ` in ${b.location.split(",")[0]}` : "";
+  const google = provider === "GOOGLE_ADS";
+  const headlines = google
+    ? [b.name, `${b.industry}${city}`, "Get A Free Quote Today", "Trusted Local Service", "Book Online In Minutes", "Friendly, Reliable Team", "See Our Latest Offers", "Call Us Today"]
+    : [source?.headlines[0] ?? `${b.name}: ${b.industry}${city}`, `Why locals choose ${b.name}`, "See what we can do for you"];
+  return {
+    campaignName: `${b.name} – ${provider === "GOOGLE_ADS" ? "Search" : provider} – ${new Date().toLocaleString("en-US", { month: "short", year: "numeric" })}`,
+    headlines: headlines.map((h) => (google ? h.slice(0, 30) : h)),
+    descriptions: [
+      `${b.description}`.slice(0, 90),
+      `Contact ${b.name} today. [your phone number]`.slice(0, 90),
+      `Serving ${b.location || "your area"}. Fast, friendly service.`.slice(0, 90),
+    ],
+    primaryText: source?.bigIdea ?? `${b.name} helps ${b.targetAudience}. ${b.goals}`.slice(0, 200),
+    callToAction: "LEARN_MORE",
+    keywords: google ? [`${b.industry}${city}`.toLowerCase(), `${b.industry} near me`.toLowerCase(), `${b.industry} company`.toLowerCase(), `${b.industry} services`.toLowerCase()] : [],
+    imageIdea: `A bright photo of ${b.name}'s work or team, with the business name.`,
   };
 }

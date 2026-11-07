@@ -223,3 +223,79 @@ export async function campaign(
   );
   return { campaign: out, ai: true };
 }
+
+// ---------------------------------------------------------------------------
+// Ad budget allocation
+
+const ProviderEnum = z.enum(["META", "GOOGLE_ADS", "LINKEDIN", "TIKTOK", "X"]);
+
+export const AllocationOutput = z.object({
+  summary: z.string().describe("2-3 sentences for the owner: how the budget is split and why, in plain language"),
+  splits: z.array(
+    z.object({
+      provider: ProviderEnum,
+      percent: z.number().describe("Share of the monthly ad budget, whole number; all splits sum to 100"),
+      reason: z.string().describe("1-2 sentences: why this channel gets this share, citing their goals, audience or the performance numbers given"),
+      expectedResult: z.string().describe("What this money should produce, e.g. 'calls and quote requests from local searchers'. No guaranteed numbers."),
+    }),
+  ),
+});
+export type AllocationOutput = z.infer<typeof AllocationOutput>;
+
+export async function budgetAllocation(
+  business: Business,
+  context: {
+    totalCents: number;
+    maxChannels: number;
+    baseline: { provider: string; percent: number }[];
+    perf: { provider: string; spendCents: number; clicks: number; conversions: number }[];
+    plan: { channel: string; role: string }[];
+    clientNote?: string | null;
+  },
+): Promise<AllocationOutput | null> {
+  if (!aiEnabled()) return null;
+  const perfText = context.perf.length
+    ? context.perf
+        .map((p) => `- ${p.provider}: spent $${(p.spendCents / 100).toFixed(2)}, ${p.clicks} clicks, ${p.conversions} conversions`)
+        .join("\n")
+    : "No ad results yet (first month).";
+  return generate(
+    AllocationOutput,
+    `Split this client's monthly ad budget across ad platforms so it does the most for their goals.\n\n${describeBusiness(business)}\n\nMonthly ad budget: $${(context.totalCents / 100).toFixed(2)}. Use at most ${context.maxChannels} platform(s); a platform needs at least $150/month to learn, so concentrate small budgets.\nAvailable platforms: META (Facebook + Instagram ads), GOOGLE_ADS (Search ads), LINKEDIN, TIKTOK (needs video), X.\n\nTheir marketing plan's channel strategy:\n${context.plan.map((c) => `- ${c.channel}: ${c.role}`).join("\n") || "none yet"}\n\nLast 30 days of ad results:\n${perfText}\n\nRule-based starting point (adjust it if you have a good reason):\n${context.baseline.map((b) => `- ${b.provider}: ${b.percent}%`).join("\n") || "none"}\n${context.clientNote ? `\nThe owner rejected the last split and said: "${context.clientNote}". Address this directly.` : ""}\nThe owner approves this before any money is spent, so explain each share clearly.`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ad creative for one platform
+
+export const AdCreativeOutput = z.object({
+  campaignName: z.string(),
+  headlines: z.array(z.string()).describe("Google: 8-15 headlines, each 30 characters or fewer. Others: 3-5 headlines, 40 characters or fewer"),
+  descriptions: z.array(z.string()).describe("Google: 3-4 descriptions, each 90 characters or fewer. Others: 2-3"),
+  primaryText: z.string().describe("Main ad text for social ads, 125 characters or fewer ideally"),
+  callToAction: z.enum(["LEARN_MORE", "CONTACT_US", "SIGN_UP", "BOOK_NOW", "GET_QUOTE", "SHOP_NOW", "CALL_NOW"]),
+  keywords: z.array(z.string()).describe("Google only: 10-20 phrase-match keywords people would search; empty for other platforms"),
+  imageIdea: z.string().describe("Description of the image or video to use"),
+});
+export type AdCreativeOutput = z.infer<typeof AdCreativeOutput>;
+
+export async function adCreative(
+  business: Business,
+  provider: string,
+  monthlyCents: number,
+  source: CampaignOutput | null,
+): Promise<{ creative: AdCreativeOutput; ai: boolean }> {
+  if (!aiEnabled()) return { creative: demo.adCreative(business, provider, source), ai: false };
+  const sourceText = source
+    ? `Use the client's current campaign as the starting point:\nBig idea: ${source.bigIdea}\nHeadlines: ${source.headlines.join(" | ")}\nLanding page: ${source.landingPage.headline}: ${source.landingPage.subheadline}`
+    : "No campaign yet; write from the business profile.";
+  const creative = await generate(
+    AdCreativeOutput,
+    `Write ready-to-launch ${provider} ad creative for a $${(monthlyCents / 100).toFixed(0)}/month budget.\n\n${describeBusiness(business)}\n\n${sourceText}\n\nThe ad sends people to ${business.website || "[website URL]"}. Respect the character limits exactly.`,
+  );
+  if (provider === "GOOGLE_ADS") {
+    creative.headlines = creative.headlines.map((h) => h.slice(0, 30)).filter(Boolean).slice(0, 15);
+    creative.descriptions = creative.descriptions.map((d) => d.slice(0, 90)).filter(Boolean).slice(0, 4);
+  }
+  return { creative, ai: true };
+}

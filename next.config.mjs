@@ -18,6 +18,10 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async rewrites() {
+    // Jarvis, the operations page: public/jarvis.html served at /jarvis.
+    return [{ source: "/jarvis", destination: "/jarvis.html" }];
+  },
 };
 
 export default nextConfig;

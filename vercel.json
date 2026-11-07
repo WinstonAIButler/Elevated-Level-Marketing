@@ -1,3 +1,7 @@
 {
-  "crons": [{ "path": "/api/cron/autopilot", "schedule": "0 13 * * 1" }]
+  "crons": [
+    { "path": "/api/cron/autopilot", "schedule": "0 13 * * 1" },
+    { "path": "/api/cron/publish", "schedule": "5 * * * *" },
+    { "path": "/api/cron/spend-sync", "schedule": "30 */4 * * *" }
+  ]
 }

@@ -5,6 +5,8 @@ import { campaign as generateCampaignContent } from "./ai";
 import { addDays, currentPlanWeek } from "./format";
 import { assertWithinLimit, logActivity } from "./usage";
 import { runWebsiteAudit } from "./site-audit-fetch";
+import { proposeAllocation, queueCampaignPosts } from "./publishing";
+import { startOfMonth } from "./allocation";
 
 export type AutopilotResult = { businessId: string; actions: string[]; skipped?: string };
 
@@ -16,6 +18,9 @@ const SOCIAL = /instagram|facebook|tiktok|linkedin|social|\bx\b|twitter|youtube|
  *  2. Moves this week's AI-owned plan tasks into progress (they are now in review).
  *  3. Logs reminders for overdue tasks that are waiting on the client.
  *  4. Re-audits the client's website for SEO and AI-search visibility.
+ *  5. Sends the batch's posts to Approvals for every connected channel.
+ *  6. Proposes this month's ad budget split if there isn't one yet.
+ * Nothing is posted or spent until the client approves it.
  */
 export async function runAutopilot(user: User, business: Business): Promise<AutopilotResult> {
   const actions: string[] = [];
@@ -47,7 +52,7 @@ export async function runAutopilot(user: User, business: Business): Promise<Auto
       await assertWithinLimit(user, business.id, "campaigns");
       const { campaign, ai } = await generateCampaignContent(business, brief);
       const start = new Date();
-      await db.campaign.create({
+      const created = await db.campaign.create({
         data: {
           businessId: business.id,
           planId: plan.id,
@@ -64,6 +69,8 @@ export async function runAutopilot(user: User, business: Business): Promise<Auto
         },
       });
       actions.push(`Drafted week ${week} content batch`);
+      const queued = await queueCampaignPosts(business, created);
+      if (queued) actions.push(`${queued} post${queued === 1 ? "" : "s"} sent to Approvals`);
     } catch (err) {
       actions.push(`Content batch skipped: ${err instanceof Error ? err.message : "error"}`);
     }
@@ -77,6 +84,20 @@ export async function runAutopilot(user: User, business: Business): Promise<Auto
 
   const overdue = plan.tasks.filter((t) => t.owner === "CLIENT" && t.status !== "DONE" && t.dueDate < new Date());
   if (overdue.length) actions.push(`${overdue.length} task${overdue.length === 1 ? "" : "s"} waiting on you`);
+
+  if (business.monthlyBudget > 0) {
+    const thisMonth = await db.budgetAllocation.findFirst({
+      where: { businessId: business.id, status: { in: ["PROPOSED", "APPROVED"] }, month: { gte: startOfMonth() } },
+    });
+    if (!thisMonth) {
+      try {
+        await proposeAllocation(business);
+        actions.push("Proposed this month's ad budget split for your approval");
+      } catch (err) {
+        actions.push(`Budget split skipped: ${err instanceof Error ? err.message : "error"}`);
+      }
+    }
+  }
 
   for (const message of actions) await logActivity(business.id, "autopilot", message);
 
