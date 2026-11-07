@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "./db";
 import { SESSION_COOKIE, sessionCookieOptions, signSession, verifySession } from "./session";
 
@@ -33,4 +33,23 @@ export async function requireBusiness() {
   const user = await requireUser();
   if (!user.business) redirect("/dashboard/business");
   return { user, business: user.business };
+}
+
+/** Owners Hub access: emails in OWNER_EMAILS (comma separated). */
+export function ownerEmails() {
+  return (process.env.OWNER_EMAILS || "justin.joslin@joslinholdings.biz")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isOwner(user: { email: string } | null | undefined) {
+  return Boolean(user && ownerEmails().includes(user.email.toLowerCase()));
+}
+
+/** For the Owners Hub. Signed-out people go to login; signed-in non-owners get a 404. */
+export async function requireOwner() {
+  const user = await requireUser();
+  if (!isOwner(user)) notFound();
+  return user;
 }

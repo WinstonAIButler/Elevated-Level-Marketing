@@ -275,3 +275,11 @@ fieldset .option + .option { margin-top: 8px; }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 0.9rem; cursor: pointer; }
 .check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--green-strong); flex: none; }
 .channel-card details > summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; margin-top: 8px; }
+
+/* Overview onboarding checklist */
+.checklist { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.checklist li { position: relative; padding-left: 30px; font-size: 0.95rem; }
+.checklist li::before { content: ""; position: absolute; left: 0; top: 2px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); }
+.checklist li.done { color: var(--muted); text-decoration: line-through; }
+.checklist li.done::before { border-color: var(--green-strong); background: var(--green-strong); }
+.btn.disabled { opacity: 0.5; pointer-events: none; }

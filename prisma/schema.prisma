@@ -48,36 +48,42 @@ model User {
 }
 
 model Business {
-  id                 String              @id @default(cuid())
-  userId             String              @unique
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name               String
-  industry           String
-  website            String?
-  location           String?
-  description        String
-  targetAudience     String
-  goals              String
-  brandVoice         String?
-  competitors        String?
-  monthlyBudget      Int                 @default(0)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  assessments        Assessment[]
-  plans              MarketingPlan[]
-  campaigns          Campaign[]
-  activity           Activity[]
-  websiteAudits      WebsiteAudit[]
+  id                     String              @id @default(cuid())
+  userId                 String              @unique
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                   String
+  industry               String
+  website                String?
+  location               String?
+  description            String
+  targetAudience         String
+  goals                  String
+  brandVoice             String?
+  competitors            String?
+  monthlyBudget          Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  assessments            Assessment[]
+  plans                  MarketingPlan[]
+  campaigns              Campaign[]
+  activity               Activity[]
+  websiteAudits          WebsiteAudit[]
   // Ad spend: WALLET = client prepays, Elevated runs ads from its managed accounts;
   // OWN_ACCOUNTS = client connects their own ad accounts and the platforms bill them.
-  adSpendMode        AdSpendMode         @default(WALLET)
-  walletBalanceCents Int                 @default(0)
-  walletEntries      WalletEntry[]
-  connections        ChannelConnection[]
-  allocations        BudgetAllocation[]
-  publishItems       PublishItem[]
-  channelMetrics     ChannelMetric[]
-  mediaAssets        MediaAsset[]
+  adSpendMode            AdSpendMode         @default(WALLET)
+  walletBalanceCents     Int                 @default(0)
+  walletEntries          WalletEntry[]
+  connections            ChannelConnection[]
+  allocations            BudgetAllocation[]
+  publishItems           PublishItem[]
+  channelMetrics         ChannelMetric[]
+  mediaAssets            MediaAsset[]
+  // The client's own Stripe account, created under Elevated's Connect platform. The client
+  // owns it (full Stripe Dashboard); Elevated can read it to report sales from marketing.
+  stripeAccountId        String?             @unique
+  stripeDetailsSubmitted Boolean             @default(false)
+  stripeChargesEnabled   Boolean             @default(false)
+  stripeCheckedAt        DateTime?
 }
 
 model Assessment {

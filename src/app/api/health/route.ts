@@ -21,7 +21,14 @@ export async function GET() {
     database,
     auth: (process.env.AUTH_SECRET?.length ?? 0) >= 16 ? "ok" : "missing AUTH_SECRET (16+ characters)",
     ai: aiEnabled() ? `live (${process.env.ANTHROPIC_MODEL || "claude-opus-5-5"})` : "demo mode (add ANTHROPIC_API_KEY)",
-    payments: process.env.STRIPE_SECRET_KEY ? "configured" : "off",
+    // Only the key's mode is reported (from its prefix), never the key.
+    payments: !process.env.STRIPE_SECRET_KEY
+      ? "off"
+      : /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY)
+        ? "live"
+        : /^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY)
+          ? "TEST MODE (not live)"
+          : "configured (unrecognized key type)",
     autopilot: process.env.CRON_SECRET ? "ok" : "missing CRON_SECRET",
     images: imagesEnabled() ? `on (${[process.env.OPENAI_API_KEY && "OpenAI", process.env.GOOGLE_AI_API_KEY && "Gemini"].filter(Boolean).join(" → ")})` : "off (add OPENAI_API_KEY or GOOGLE_AI_API_KEY)",
     tokenEncryption: encryptionEnabled() ? "ok" : "missing TOKEN_ENCRYPTION_KEY or CONNECTIONS_ENCRYPTION_KEY (needed to connect channels)",
