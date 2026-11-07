@@ -5,7 +5,7 @@ import { SITE_URL } from "@/lib/site";
 // are all welcome on public pages. The signed-in app stays private.
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/dashboard", "/api/"] }],
+    rules: [{ userAgent: "*", allow: "/", disallow: ["/dashboard", "/hub", "/api/"] }],
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,
   };
