@@ -170,6 +170,12 @@ export async function autoSendLead(lead: Lead) {
 export async function trackLead(lead: Lead, conn: CrmConnection) {
   if (!lead.externalId) return null;
   const t = await CONNECTORS[conn.provider].track(await live(conn), lead.externalId);
+  // "NEW" from the CRM just means nothing has happened there yet; don't undo a status
+  // or value someone set in Elevated. Real changes (contacted / won / lost) win.
+  if (t.status === "NEW" && lead.status !== "NEW") {
+    await db.lead.update({ where: { id: lead.id }, data: { crmStage: t.stage?.slice(0, 120) ?? lead.crmStage, trackedAt: new Date() } });
+    return t;
+  }
   const becameCustomer = t.status === "WON" && lead.status !== "WON";
   await db.lead.update({
     where: { id: lead.id },
