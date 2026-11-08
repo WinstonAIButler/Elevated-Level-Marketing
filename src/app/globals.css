@@ -315,3 +315,27 @@ fieldset .option + .option { margin-top: 8px; }
   .hero-card .grid-2 { grid-template-columns: 1fr; }
   .promise-row { grid-template-columns: 1fr; }
 }
+
+/* Assessment overview: score meter + red/green areas */
+.meter-card { text-align: center; }
+.meter-card h2 { text-align: left; }
+.meter { position: relative; width: 230px; height: 207px; margin: 0 auto 4px; }
+.meter svg { display: block; }
+.meter-value { position: absolute; inset: 0 0 18px; display: grid; place-content: center; text-align: center; }
+.meter-value strong { font-size: 3.4rem; line-height: 1; font-weight: 800; color: var(--ink); }
+.meter-value span { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+.meter-change { position: absolute; top: 10px; right: -18px; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; }
+.meter-change.up { background: var(--green-soft); color: var(--good); }
+.meter-change.down { background: #fdecea; color: var(--bad); }
+.area-title.bad { color: var(--bad); }
+.area-title.good { color: var(--good); }
+.area-row h3.area-name { margin: 0 0 6px; font-size: 1rem; }
+.area-name.bad { color: var(--bad); }
+.area-name.good { color: var(--good); }
+.meter-fill { animation: meter-sweep 1.4s cubic-bezier(0.33, 1, 0.68, 1) both; }
+@keyframes meter-sweep { from { stroke-dasharray: 0 100; } }
+.meter-change { animation: meter-pop 0.4s 1.3s ease-out both; }
+@keyframes meter-pop { from { opacity: 0; transform: translateY(6px); } }
+.area-row .bar > span { animation: bar-grow 0.9s 0.5s cubic-bezier(0.33, 1, 0.68, 1) both; }
+@keyframes bar-grow { from { width: 0; } }
+@media (prefers-reduced-motion: reduce) { .meter-fill, .meter-change, .area-row .bar > span { animation: none; } }
