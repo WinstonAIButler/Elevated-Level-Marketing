@@ -59,7 +59,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         ))}
       </div>
 
-      <div className="grid grid-2x" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(280px,1fr)", gap: 20, alignItems: "start" }}>
+      <div className="grid leads-layout">
         <div className="card">
           <form className="row" style={{ marginBottom: 12 }}>
             <input name="q" defaultValue={q} placeholder="Search name, email or phone" aria-label="Search leads" style={{ flex: "1 1 200px" }} />
