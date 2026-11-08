@@ -60,3 +60,8 @@ export function pricingTable() {
 }
 
 export const trialCost = () => monthlyCost(TIERS.TRIAL).total;
+
+/** Margin if the plan were sold at a different monthly price (e.g. the live Stripe price). */
+export function marginAtPrice(t: TierInfo, dollars: number) {
+  return margin({ ...t, price: dollars });
+}

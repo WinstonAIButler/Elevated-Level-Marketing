@@ -8,6 +8,7 @@ export const maxDuration = 300;
 
 const LINKS = [
   { href: "/hub", label: "Overview" },
+  { href: "/hub#pricing", label: "Plan prices" },
   { href: "/hub#queue", label: "Team queue" },
   { href: "/hub#access", label: "Account access" },
   { href: "/hub#clients", label: "Clients" },
