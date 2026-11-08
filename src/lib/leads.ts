@@ -1,11 +1,11 @@
 import "server-only";
-import type { Business, CrmProvider, LeadStatus } from "@prisma/client";
+import type { Business, LeadStatus } from "@prisma/client";
 import { db } from "./db";
 import { addDays } from "./format";
 import { logActivity } from "./usage";
-import { CHANNEL_LABELS, normalizeSource, resultsSummary, type Channel, type LeadDraft } from "./leads-core";
+import { CHANNEL_LABELS, normalizeSource, resultsSummary, type Channel } from "./leads-core";
 import { TIERS } from "./tiers";
-import { pushLeadToCrms } from "./crm";
+import { autoSendLead } from "./crm";
 
 export type NewLead = {
   name: string;
@@ -24,8 +24,8 @@ export type NewLead = {
 
 /**
  * Saves a new lead. A repeat from the same email within 30 days is treated as the same
- * lead (the note is appended) rather than a duplicate. New leads are pushed to the
- * client's CRM when they've asked for that.
+ * lead (the note is appended) rather than a duplicate. New leads are sent to the
+ * client's CRM when they've asked for that, and followed there until they buy.
  */
 export async function recordLead(business: Pick<Business, "id" | "name">, lead: NewLead) {
   const email = lead.email?.trim().toLowerCase() || null;
@@ -63,9 +63,8 @@ export async function recordLead(business: Pick<Business, "id" | "name">, lead: 
       occurredAt: lead.occurredAt ?? new Date(),
     },
   });
-  if (lead.origin === "form" || lead.origin === "webhook" || lead.origin === "manual") {
-    await pushLeadToCrms(business.id, created).catch((err) => console.error("CRM push failed", err));
-  }
+  // Leads Elevated brought in go to the client's CRM (when they've turned that on) so we can follow them to a sale.
+  if (lead.origin === "form" || lead.origin === "webhook" || lead.elevated) await autoSendLead(created);
   if (lead.origin === "form" || lead.origin === "webhook") {
     await logActivity(
       business.id,
@@ -74,67 +73,6 @@ export async function recordLead(business: Pick<Business, "id" | "name">, lead: 
     );
   }
   return { lead: created, duplicate: false };
-}
-
-/** Bulk import from a spreadsheet. Skips rows whose email (or name + phone) is already on file. */
-export async function importLeadDrafts(businessId: string, drafts: LeadDraft[]) {
-  const existing = await db.lead.findMany({ where: { businessId }, select: { email: true, name: true, phone: true } });
-  const seen = new Set(existing.flatMap((l) => [l.email ?? "", `${l.name.toLowerCase()}|${l.phone ?? ""}`]).filter(Boolean));
-  const fresh = drafts.filter((d) => {
-    const keys = [d.email ?? "", `${d.name.toLowerCase()}|${d.phone ?? ""}`].filter(Boolean);
-    if (keys.some((k) => seen.has(k))) return false;
-    keys.forEach((k) => seen.add(k));
-    return true;
-  });
-  const now = new Date();
-  for (let i = 0; i < fresh.length; i += 500) {
-    await db.lead.createMany({
-      data: fresh.slice(i, i + 500).map((d) => ({
-        businessId,
-        name: d.name,
-        email: d.email,
-        phone: d.phone,
-        company: d.company,
-        source: d.source,
-        status: d.status,
-        valueCents: d.valueCents,
-        wonAt: d.status === "WON" ? d.occurredAt ?? now : null,
-        origin: "import",
-        occurredAt: d.occurredAt ?? now,
-      })),
-    });
-  }
-  return { imported: fresh.length, skipped: drafts.length - fresh.length };
-}
-
-/** Upserts leads coming from a CRM sync, keyed by the CRM's own id. */
-export async function upsertCrmLeads(businessId: string, crm: CrmProvider, items: (LeadDraft & { externalId: string })[]) {
-  let created = 0;
-  for (const d of items) {
-    const res = await db.lead.upsert({
-      where: { businessId_crm_externalId: { businessId, crm, externalId: d.externalId } },
-      create: {
-        businessId,
-        crm,
-        externalId: d.externalId,
-        name: d.name,
-        email: d.email,
-        phone: d.phone,
-        company: d.company,
-        source: d.source,
-        status: d.status,
-        valueCents: d.valueCents,
-        wonAt: d.status === "WON" ? d.occurredAt ?? new Date() : null,
-        origin: "crm",
-        occurredAt: d.occurredAt ?? new Date(),
-      },
-      // The CRM is the source of truth for status and value; keep our source/elevated tags.
-      update: { status: d.status, valueCents: d.valueCents, ...(d.status === "WON" ? { wonAt: d.occurredAt ?? undefined } : {}) },
-      select: { createdAt: true, updatedAt: true },
-    });
-    if (res.createdAt.getTime() === res.updatedAt.getTime()) created++;
-  }
-  return created;
 }
 
 /** Results for one business: before vs since Elevated, from leads plus spend. */

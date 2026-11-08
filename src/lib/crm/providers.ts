@@ -1,17 +1,18 @@
 import "server-only";
 import type { CrmProvider } from "@prisma/client";
 import { fetchJson } from "../publishers/http";
-import { normalizeSource, parseDate, parseStatus, type Channel, type LeadDraft } from "../leads-core";
+import { parseDate, parseStatus, type LeadStatusValue } from "../leads-core";
 
-// The five CRM connectors. Each one can verify a connection, pull contacts plus closed
-// deals / paid jobs (so we know who became a customer and for how much), and push new
-// leads Elevated captures into the CRM.
+// The five CRM connectors. Elevated never imports a client's customer list. It sends
+// each lead it brings in to the client's CRM (or finds the record if the person is
+// already there), keeps that record's id, and follows only that record: its stage and
+// any deals / jobs / invoices linked to it, so we can see when it became a sale.
 // API docs: developers.hubspot.com, developers.pipedrive.com, zoho.com/crm/developer,
 // developer.getjobber.com, docs.housecallpro.com.
 
 export type CrmConn = { provider: CrmProvider; token: string; extra: Record<string, any> };
-export type PulledLead = LeadDraft & { externalId: string };
 export type PushLead = { name: string; email: string | null; phone: string | null; company: string | null; source: string; notes: string | null };
+export type Tracked = { status: LeadStatusValue; valueCents: number; wonAt: Date | null; stage: string | null };
 
 export type CrmConnector = {
   name: string;
@@ -20,66 +21,46 @@ export type CrmConnector = {
   tokenLabel?: string;
   tokenSteps?: string[];
   verify(c: CrmConn): Promise<{ accountName: string }>;
-  pull(c: CrmConn): Promise<PulledLead[]>;
+  /** Creates the lead in the CRM, or returns the existing record for the same email. Returns the CRM's id. */
   push?(c: CrmConn, lead: PushLead): Promise<string | null>;
+  /** Finds a record by email when we can't create one (import-only CRMs). */
+  find?(c: CrmConn, email: string): Promise<string | null>;
+  /** Where that one record stands now. */
+  track(c: CrmConn, externalId: string): Promise<Tracked>;
 };
-
-const MAX = 3000; // records per object type per sync
 
 const splitName = (name: string) => {
   const parts = name.trim().split(/\s+/);
-  return { first: parts.length > 1 ? parts.slice(0, -1).join(" ") : "", last: parts.length > 1 ? parts[parts.length - 1] : parts[0] };
+  return { first: parts.length > 1 ? parts.slice(0, -1).join(" ") : "", last: parts[parts.length - 1] };
 };
-const joinName = (...p: (string | null | undefined)[]) => p.filter((x) => x && String(x).trim()).join(" ").trim();
 
-function draft(externalId: string, name: string, f: Partial<LeadDraft> = {}): PulledLead {
-  return {
-    externalId,
-    name: (name || f.email || f.phone || "Unnamed contact").slice(0, 200),
-    email: f.email?.toLowerCase() ?? null,
-    phone: f.phone ?? null,
-    company: f.company ?? null,
-    source: f.source ?? "other",
-    status: f.status ?? "NEW",
-    valueCents: f.valueCents ?? 0,
-    occurredAt: f.occurredAt ?? null,
-  };
-}
+type Deal = { status: "WON" | "LOST" | "OPEN"; cents: number; at: Date | null; stage?: string | null };
 
-/** Applies deals/jobs to the contacts they belong to: won adds value and marks the contact a customer. */
-function applyDeals(byId: Map<string, PulledLead>, deals: { contactId: string | null; status: "WON" | "LOST" | "OPEN"; cents: number; at: Date | null; title: string; id: string }[]) {
-  for (const d of deals) {
-    let lead = d.contactId ? byId.get(d.contactId) : undefined;
-    if (!lead) {
-      if (d.status !== "WON") continue;
-      lead = draft(`deal:${d.id}`, d.title, { status: "WON" });
-      byId.set(lead.externalId, lead);
-    }
-    if (d.status === "WON") {
-      lead.status = "WON";
-      lead.valueCents += d.cents;
-      if (d.at && (!lead.occurredAt || d.at > lead.occurredAt)) lead.occurredAt = lead.occurredAt ?? d.at;
-    } else if (d.status === "OPEN" && lead.status === "NEW") lead.status = "CONTACTED";
-    else if (d.status === "LOST" && lead.status === "NEW") lead.status = "LOST";
+/** Combines a record's own stage with its deals/jobs: any won deal makes it a sale (values add up). */
+function combine(recordStatus: LeadStatusValue, stage: string | null, deals: Deal[]): Tracked {
+  const won = deals.filter((d) => d.status === "WON");
+  if (won.length) {
+    const wonAt = won.map((d) => d.at).filter((d): d is Date => Boolean(d)).sort((a, b) => b.getTime() - a.getTime())[0] ?? new Date();
+    return { status: "WON", valueCents: won.reduce((a, d) => a + d.cents, 0), wonAt, stage: won[0].stage ?? stage ?? "Won" };
   }
+  if (deals.some((d) => d.status === "OPEN")) return { status: recordStatus === "LOST" ? "LOST" : "CONTACTED", valueCents: 0, wonAt: null, stage: deals.find((d) => d.status === "OPEN")?.stage ?? stage };
+  if (deals.length && deals.every((d) => d.status === "LOST")) return { status: "LOST", valueCents: 0, wonAt: null, stage: deals[0].stage ?? stage ?? "Lost" };
+  return { status: recordStatus, valueCents: 0, wonAt: recordStatus === "WON" ? new Date() : null, stage };
 }
 
 // ---------------------------------------------------------------------------
 // HubSpot
 
-const HUBSPOT_SOURCE: Record<string, Channel> = {
-  ORGANIC_SEARCH: "google",
-  PAID_SEARCH: "google_ads",
-  SOCIAL_MEDIA: "facebook",
-  PAID_SOCIAL: "facebook",
-  EMAIL_MARKETING: "email",
-  REFERRALS: "referral",
-  DIRECT_TRAFFIC: "website",
-  AI_REFERRALS: "ai_search",
-};
-
 const hs = (c: CrmConn, path: string, init: RequestInit = {}) =>
   fetchJson<any>(`https://api.hubapi.com${path}`, { ...init, headers: { Authorization: `Bearer ${c.token}`, "Content-Type": "application/json", ...(init.headers ?? {}) } });
+
+async function hubspotFind(c: CrmConn, email: string) {
+  const res = await hs(c, "/crm/v3/objects/contacts/search", {
+    method: "POST",
+    body: JSON.stringify({ filterGroups: [{ filters: [{ propertyName: "email", operator: "EQ", value: email }] }], limit: 1 }),
+  });
+  return res.results?.[0]?.id ?? null;
+}
 
 const hubspot: CrmConnector = {
   name: "HubSpot",
@@ -95,57 +76,39 @@ const hubspot: CrmConnector = {
     await hs(c, "/crm/v3/objects/contacts?limit=1");
     return { accountName: info?.portalId ? `HubSpot account ${info.portalId}` : "HubSpot" };
   },
-  async pull(c) {
-    const byId = new Map<string, PulledLead>();
-    let after: string | undefined;
-    do {
-      const res = await hs(c, `/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,email,phone,company,hs_analytics_source,lifecyclestage,createdate${after ? `&after=${after}` : ""}`);
-      for (const r of res.results ?? []) {
-        const p = r.properties ?? {};
-        const stage = String(p.lifecyclestage ?? "");
-        byId.set(r.id, draft(r.id, joinName(p.firstname, p.lastname), {
-          email: p.email, phone: p.phone, company: p.company,
-          source: HUBSPOT_SOURCE[p.hs_analytics_source] ?? normalizeSource(p.hs_analytics_source),
-          status: stage === "customer" ? "WON" : /opportunity|salesqualified|marketingqualified/.test(stage) ? "CONTACTED" : "NEW",
-          occurredAt: parseDate(p.createdate),
-        }));
-      }
-      after = res.paging?.next?.after;
-    } while (after && byId.size < MAX);
-
-    const deals: Parameters<typeof applyDeals>[1] = [];
-    after = undefined;
-    do {
-      const res = await hs(c, `/crm/v3/objects/deals?limit=100&properties=dealname,amount,hs_is_closed_won,hs_is_closed,closedate&associations=contacts${after ? `&after=${after}` : ""}`);
-      for (const d of res.results ?? []) {
-        const p = d.properties ?? {};
-        const won = p.hs_is_closed_won === "true";
-        deals.push({
-          id: d.id,
-          title: p.dealname ?? "HubSpot deal",
-          contactId: d.associations?.contacts?.results?.[0]?.id ?? null,
-          status: won ? "WON" : p.hs_is_closed === "true" ? "LOST" : "OPEN",
-          cents: Math.round(Number(p.amount || 0) * 100),
-          at: parseDate(p.closedate),
-        });
-      }
-      after = res.paging?.next?.after;
-    } while (after && deals.length < MAX);
-    applyDeals(byId, deals);
-    return [...byId.values()];
-  },
   async push(c, lead) {
-    const { first, last } = splitName(lead.name);
-    try {
-      const res = await hs(c, "/crm/v3/objects/contacts", {
-        method: "POST",
-        body: JSON.stringify({ properties: { firstname: first, lastname: last, email: lead.email ?? undefined, phone: lead.phone ?? undefined, company: lead.company ?? undefined } }),
-      });
-      return res.id ?? null;
-    } catch (err: any) {
-      if (err?.status === 409) return null; // already in HubSpot
-      throw err;
+    if (lead.email) {
+      const existing = await hubspotFind(c, lead.email);
+      if (existing) return existing;
     }
+    const { first, last } = splitName(lead.name);
+    const res = await hs(c, "/crm/v3/objects/contacts", {
+      method: "POST",
+      body: JSON.stringify({ properties: { firstname: first, lastname: last, email: lead.email ?? undefined, phone: lead.phone ?? undefined, company: lead.company ?? undefined, hs_lead_status: "NEW" } }),
+    });
+    return res.id ?? null;
+  },
+  find: hubspotFind,
+  async track(c, id) {
+    const contact = await hs(c, `/crm/v3/objects/contacts/${id}?properties=lifecyclestage,hs_lead_status&associations=deals`);
+    const stage = String(contact.properties?.lifecyclestage ?? "");
+    const leadStatus = String(contact.properties?.hs_lead_status ?? "");
+    const dealIds: string[] = (contact.associations?.deals?.results ?? []).map((d: any) => d.id);
+    let deals: Deal[] = [];
+    if (dealIds.length) {
+      const res = await hs(c, "/crm/v3/objects/deals/batch/read", {
+        method: "POST",
+        body: JSON.stringify({ properties: ["amount", "hs_is_closed_won", "hs_is_closed", "closedate", "dealstage"], inputs: dealIds.slice(0, 100).map((x) => ({ id: x })) }),
+      });
+      deals = (res.results ?? []).map((d: any) => ({
+        status: d.properties.hs_is_closed_won === "true" ? "WON" : d.properties.hs_is_closed === "true" ? "LOST" : "OPEN",
+        cents: Math.round(Number(d.properties.amount || 0) * 100),
+        at: parseDate(d.properties.closedate),
+        stage: d.properties.dealstage ?? null,
+      }));
+    }
+    const own: LeadStatusValue = stage === "customer" ? "WON" : /UNQUALIFIED|BAD_TIMING/.test(leadStatus) ? "LOST" : leadStatus && leadStatus !== "NEW" ? "CONTACTED" : /opportunity|salesqualified/.test(stage) ? "CONTACTED" : "NEW";
+    return combine(own, leadStatus || stage || null, deals);
   },
 };
 
@@ -160,57 +123,26 @@ function pd(c: CrmConn, path: string, init: RequestInit = {}) {
   return fetchJson<any>(url, { ...init, headers: { "Content-Type": "application/json", ...(oauth ? { Authorization: `Bearer ${c.token}` } : {}), ...(init.headers ?? {}) } });
 }
 
-const firstValue = (v: any) => (Array.isArray(v) ? (v.find((x) => x?.primary) ?? v[0])?.value : v) || null;
+async function pipedriveFind(c: CrmConn, email: string) {
+  const res = await pd(c, `/persons/search?term=${encodeURIComponent(email)}&fields=email&exact_match=true&limit=1`);
+  const id = res.data?.items?.[0]?.item?.id;
+  return id ? String(id) : null;
+}
 
 const pipedrive: CrmConnector = {
   name: "Pipedrive",
   methods: ["token", "oauth"],
   tokenLabel: "Personal API token",
-  tokenSteps: [
-    "In Pipedrive, click your profile picture → Personal preferences → API.",
-    "Copy your personal API token and paste it here.",
-  ],
+  tokenSteps: ["In Pipedrive, click your profile picture → Personal preferences → API.", "Copy your personal API token and paste it here."],
   async verify(c) {
     const me = await pd(c, "/users/me");
     return { accountName: me.data?.company_name ? `${me.data.company_name} (Pipedrive)` : "Pipedrive" };
   },
-  async pull(c) {
-    const byId = new Map<string, PulledLead>();
-    let start = 0;
-    for (;;) {
-      const res = await pd(c, `/persons?start=${start}&limit=100`);
-      for (const p of res.data ?? []) {
-        byId.set(String(p.id), draft(String(p.id), p.name, {
-          email: firstValue(p.email), phone: firstValue(p.phone), company: p.org_name ?? null, occurredAt: parseDate(p.add_time),
-        }));
-      }
-      const more = res.additional_data?.pagination?.more_items_in_collection;
-      if (!more || byId.size >= MAX) break;
-      start = res.additional_data.pagination.next_start;
-    }
-    const deals: Parameters<typeof applyDeals>[1] = [];
-    start = 0;
-    for (;;) {
-      const res = await pd(c, `/deals?status=all_not_deleted&start=${start}&limit=100`);
-      for (const d of res.data ?? []) {
-        const personId = typeof d.person_id === "object" && d.person_id ? d.person_id.value : d.person_id;
-        deals.push({
-          id: String(d.id),
-          title: d.title ?? "Pipedrive deal",
-          contactId: personId ? String(personId) : null,
-          status: d.status === "won" ? "WON" : d.status === "lost" ? "LOST" : "OPEN",
-          cents: Math.round(Number(d.value || 0) * 100),
-          at: parseDate(d.won_time ?? d.close_time),
-        });
-      }
-      const more = res.additional_data?.pagination?.more_items_in_collection;
-      if (!more || deals.length >= MAX) break;
-      start = res.additional_data.pagination.next_start;
-    }
-    applyDeals(byId, deals);
-    return [...byId.values()];
-  },
   async push(c, lead) {
+    if (lead.email) {
+      const existing = await pipedriveFind(c, lead.email);
+      if (existing) return existing;
+    }
     const res = await pd(c, "/persons", {
       method: "POST",
       body: JSON.stringify({
@@ -221,10 +153,22 @@ const pipedrive: CrmConnector = {
     });
     return res.data?.id ? String(res.data.id) : null;
   },
+  find: pipedriveFind,
+  async track(c, id) {
+    const res = await pd(c, `/persons/${id}/deals?status=all_not_deleted&limit=100`);
+    const deals: Deal[] = (res.data ?? []).map((d: any) => ({
+      status: d.status === "won" ? "WON" : d.status === "lost" ? "LOST" : "OPEN",
+      cents: Math.round(Number(d.value || 0) * 100),
+      at: parseDate(d.won_time ?? d.close_time),
+      stage: d.status === "open" ? `Deal open: ${d.title}` : `Deal ${d.status}`,
+    }));
+    return combine("NEW", null, deals);
+  },
 };
 
 // ---------------------------------------------------------------------------
-// Zoho CRM (sign-in only)
+// Zoho CRM (sign-in only). We create a Lead; when the client converts it, Zoho turns
+// it into a Contact (+ Deal), so we follow the person by email from then on.
 
 const ZOHO_VERSION = process.env.ZOHO_CRM_API_VERSION || "v7";
 const zo = (c: CrmConn, path: string, init: RequestInit = {}) =>
@@ -233,14 +177,9 @@ const zo = (c: CrmConn, path: string, init: RequestInit = {}) =>
     headers: { Authorization: `Zoho-oauthtoken ${c.token}`, "Content-Type": "application/json", ...(init.headers ?? {}) },
   });
 
-async function zohoAll(c: CrmConn, module: string, fields: string) {
-  const out: any[] = [];
-  for (let page = 1; out.length < MAX; page++) {
-    const res = await zo(c, `/${module}?fields=${fields}&per_page=200&page=${page}`);
-    out.push(...(res?.data ?? []));
-    if (!res?.info?.more_records) break;
-  }
-  return out;
+async function zohoSearch(c: CrmConn, module: string, email: string) {
+  const res = await zo(c, `/${module}/search?email=${encodeURIComponent(email)}`).catch(() => null);
+  return res?.data?.[0]?.id ? String(res.data[0].id) : null;
 }
 
 const zoho: CrmConnector = {
@@ -250,32 +189,13 @@ const zoho: CrmConnector = {
     const org = await zo(c, "/org").catch(() => null);
     return { accountName: org?.org?.[0]?.company_name ? `${org.org[0].company_name} (Zoho CRM)` : "Zoho CRM" };
   },
-  async pull(c) {
-    const byId = new Map<string, PulledLead>();
-    const leads = await zohoAll(c, "Leads", "First_Name,Last_Name,Email,Phone,Company,Lead_Source,Lead_Status,Created_Time");
-    for (const l of leads) {
-      byId.set(`lead:${l.id}`, draft(`lead:${l.id}`, joinName(l.First_Name, l.Last_Name), {
-        email: l.Email, phone: l.Phone, company: l.Company, source: normalizeSource(l.Lead_Source), status: parseStatus(l.Lead_Status), occurredAt: parseDate(l.Created_Time),
-      }));
-    }
-    const contacts = await zohoAll(c, "Contacts", "First_Name,Last_Name,Email,Phone,Account_Name,Lead_Source,Created_Time");
-    for (const x of contacts) {
-      byId.set(`contact:${x.id}`, draft(`contact:${x.id}`, joinName(x.First_Name, x.Last_Name), {
-        email: x.Email, phone: x.Phone, company: x.Account_Name?.name ?? null, source: normalizeSource(x.Lead_Source), status: "CONTACTED", occurredAt: parseDate(x.Created_Time),
-      }));
-    }
-    const deals = await zohoAll(c, "Deals", "Deal_Name,Amount,Stage,Closing_Date,Contact_Name");
-    applyDeals(byId, deals.map((d) => ({
-      id: String(d.id),
-      title: d.Deal_Name ?? "Zoho deal",
-      contactId: d.Contact_Name?.id ? `contact:${d.Contact_Name.id}` : null,
-      status: /closed.?won/i.test(d.Stage ?? "") ? "WON" : /closed.?lost/i.test(d.Stage ?? "") ? "LOST" : "OPEN",
-      cents: Math.round(Number(d.Amount || 0) * 100),
-      at: parseDate(d.Closing_Date),
-    })));
-    return [...byId.values()];
-  },
   async push(c, lead) {
+    if (lead.email) {
+      const contact = await zohoSearch(c, "Contacts", lead.email);
+      if (contact) return `contact:${contact}:${lead.email}`;
+      const existing = await zohoSearch(c, "Leads", lead.email);
+      if (existing) return `lead:${existing}:${lead.email}`;
+    }
     const { first, last } = splitName(lead.name);
     const res = await zo(c, "/Leads", {
       method: "POST",
@@ -283,12 +203,36 @@ const zoho: CrmConnector = {
         data: [{ First_Name: first || undefined, Last_Name: last, Email: lead.email ?? undefined, Phone: lead.phone ?? undefined, Company: lead.company ?? undefined, Description: `Lead from Elevated (source: ${lead.source})${lead.notes ? `\n${lead.notes}` : ""}` }],
       }),
     });
-    return res?.data?.[0]?.details?.id ? `lead:${res.data[0].details.id}` : null;
+    const id = res?.data?.[0]?.details?.id;
+    return id ? `lead:${id}:${lead.email ?? ""}` : null;
+  },
+  async track(c, externalId) {
+    const [kind, id, email] = externalId.split(":");
+    if (kind === "lead") {
+      const lead = await zo(c, `/Leads/${id}?fields=Lead_Status`).catch(() => null);
+      const row = lead?.data?.[0];
+      if (row) {
+        const st = row.Lead_Status ?? null;
+        return { status: parseStatus(st), valueCents: 0, wonAt: null, stage: st };
+      }
+    }
+    // Converted (or was a contact all along): follow the contact's deals.
+    const contactId = kind === "contact" ? id : email ? await zohoSearch(c, "Contacts", email) : null;
+    if (!contactId) return { status: "LOST", valueCents: 0, wonAt: null, stage: "No longer in Zoho" };
+    const res = await zo(c, `/Contacts/${contactId}/Deals?fields=Stage,Amount,Closing_Date`).catch(() => null);
+    const deals: Deal[] = (res?.data ?? []).map((d: any) => ({
+      status: /closed.?won/i.test(d.Stage ?? "") ? "WON" : /closed.?lost/i.test(d.Stage ?? "") ? "LOST" : "OPEN",
+      cents: Math.round(Number(d.Amount || 0) * 100),
+      at: parseDate(d.Closing_Date),
+      stage: d.Stage ?? null,
+    }));
+    return combine("CONTACTED", "Converted to contact", deals);
   },
 };
 
 // ---------------------------------------------------------------------------
-// Jobber (sign-in only; GraphQL). Pull only for now: clients + paid invoices.
+// Jobber (sign-in only; GraphQL). We don't create clients in Jobber; we find the
+// person by email once the client adds them, then follow their invoices.
 
 const JOBBER_VERSION = process.env.JOBBER_API_VERSION || "2025-01-20";
 async function jb(c: CrmConn, query: string, variables: Record<string, unknown> = {}) {
@@ -308,41 +252,19 @@ const jobber: CrmConnector = {
     const d = await jb(c, "query { account { name } }");
     return { accountName: d?.account?.name ? `${d.account.name} (Jobber)` : "Jobber" };
   },
-  async pull(c) {
-    const byId = new Map<string, PulledLead>();
-    let after: string | null = null;
-    do {
-      const d: any = await jb(c, `query($after: String) { clients(first: 50, after: $after) { nodes { id firstName lastName companyName createdAt emails { address primary } phones { number primary } } pageInfo { hasNextPage endCursor } } }`, { after });
-      for (const n of d.clients.nodes) {
-        byId.set(n.id, draft(n.id, joinName(n.firstName, n.lastName) || n.companyName, {
-          email: (n.emails?.find((e: any) => e.primary) ?? n.emails?.[0])?.address ?? null,
-          phone: (n.phones?.find((p: any) => p.primary) ?? n.phones?.[0])?.number ?? null,
-          company: n.companyName ?? null,
-          occurredAt: parseDate(n.createdAt),
-        }));
-      }
-      after = d.clients.pageInfo.hasNextPage ? d.clients.pageInfo.endCursor : null;
-    } while (after && byId.size < MAX);
-
-    const deals: Parameters<typeof applyDeals>[1] = [];
-    after = null;
-    do {
-      const d: any = await jb(c, `query($after: String) { invoices(first: 50, after: $after) { nodes { id invoiceNumber invoiceStatus issuedDate amounts { total } client { id } } pageInfo { hasNextPage endCursor } } }`, { after });
-      for (const n of d.invoices.nodes) {
-        const status = String(n.invoiceStatus ?? "").toLowerCase();
-        deals.push({
-          id: n.id,
-          title: `Invoice ${n.invoiceNumber ?? ""}`.trim(),
-          contactId: n.client?.id ?? null,
-          status: status === "paid" ? "WON" : /bad_debt|void/.test(status) ? "LOST" : "OPEN",
-          cents: Math.round(Number(n.amounts?.total ?? 0) * 100),
-          at: parseDate(n.issuedDate),
-        });
-      }
-      after = d.invoices.pageInfo.hasNextPage ? d.invoices.pageInfo.endCursor : null;
-    } while (after && deals.length < MAX);
-    applyDeals(byId, deals);
-    return [...byId.values()];
+  async find(c, email) {
+    const d = await jb(c, `query($q: String) { clients(first: 5, searchTerm: $q) { nodes { id emails { address } } } }`, { q: email });
+    const hit = d.clients.nodes.find((n: any) => n.emails?.some((e: any) => e.address?.toLowerCase() === email.toLowerCase()));
+    return hit?.id ?? null;
+  },
+  async track(c, id) {
+    const d = await jb(c, `query($id: EncodedId!) { client(id: $id) { invoices(first: 50) { nodes { invoiceStatus issuedDate amounts { total } } } jobs(first: 20) { nodes { jobStatus } } } }`, { id });
+    const deals: Deal[] = (d.client?.invoices?.nodes ?? []).map((n: any) => {
+      const s = String(n.invoiceStatus ?? "").toLowerCase();
+      return { status: s === "paid" ? "WON" : /bad_debt|void/.test(s) ? "LOST" : "OPEN", cents: Math.round(Number(n.amounts?.total ?? 0) * 100), at: parseDate(n.issuedDate), stage: `Invoice ${s}` };
+    });
+    const hasJobs = (d.client?.jobs?.nodes ?? []).length > 0;
+    return combine(hasJobs ? "CONTACTED" : "NEW", hasJobs ? "Job scheduled" : "Client added", deals);
   },
 };
 
@@ -355,57 +277,42 @@ const hcp = (c: CrmConn, path: string, init: RequestInit = {}) =>
     headers: { Authorization: `Token ${c.token}`, Accept: "application/json", "Content-Type": "application/json", ...(init.headers ?? {}) },
   });
 
+async function hcpFind(c: CrmConn, email: string) {
+  const res = await hcp(c, `/customers?q=${encodeURIComponent(email)}&page_size=5`);
+  const hit = (res.customers ?? []).find((x: any) => String(x.email ?? "").toLowerCase() === email.toLowerCase());
+  return hit?.id ?? null;
+}
+
 const housecallPro: CrmConnector = {
   name: "Housecall Pro",
   methods: ["token"],
   tokenLabel: "API key",
-  tokenSteps: [
-    "In Housecall Pro, go to My Apps → App Store → API (requires the MAX plan).",
-    "Generate an API key and paste it here.",
-  ],
+  tokenSteps: ["In Housecall Pro, go to My Apps → App Store → API (requires the MAX plan).", "Generate an API key and paste it here."],
   async verify(c) {
     const co = await hcp(c, "/company").catch(() => null);
     await hcp(c, "/customers?page=1&page_size=1");
     return { accountName: co?.name ? `${co.name} (Housecall Pro)` : "Housecall Pro" };
   },
-  async pull(c) {
-    const byId = new Map<string, PulledLead>();
-    for (let page = 1; byId.size < MAX; page++) {
-      const res = await hcp(c, `/customers?page=${page}&page_size=100`);
-      for (const x of res.customers ?? []) {
-        byId.set(x.id, draft(x.id, joinName(x.first_name, x.last_name) || x.company, {
-          email: x.email ?? null, phone: x.mobile_number ?? x.home_number ?? x.work_number ?? null, company: x.company ?? null,
-          source: normalizeSource(x.lead_source), occurredAt: parseDate(x.created_at),
-        }));
-      }
-      if (!res.total_pages || page >= res.total_pages) break;
-    }
-    const deals: Parameters<typeof applyDeals>[1] = [];
-    for (let page = 1; deals.length < MAX; page++) {
-      const res = await hcp(c, `/jobs?page=${page}&page_size=100`);
-      for (const j of res.jobs ?? []) {
-        const status = String(j.work_status ?? "").toLowerCase();
-        deals.push({
-          id: j.id,
-          title: j.description ?? "Housecall Pro job",
-          contactId: j.customer?.id ?? null,
-          status: /complete/.test(status) ? "WON" : /cancel/.test(status) ? "LOST" : "OPEN",
-          cents: Math.round(Number(j.total_amount ?? 0)), // Housecall Pro amounts are in cents
-          at: parseDate(j.work_timestamps?.completed_at ?? j.created_at),
-        });
-      }
-      if (!res.total_pages || page >= res.total_pages) break;
-    }
-    applyDeals(byId, deals);
-    return [...byId.values()];
-  },
   async push(c, lead) {
+    if (lead.email) {
+      const existing = await hcpFind(c, lead.email);
+      if (existing) return existing;
+    }
     const { first, last } = splitName(lead.name);
     const res = await hcp(c, "/customers", {
       method: "POST",
       body: JSON.stringify({ first_name: first || last, last_name: first ? last : "", email: lead.email ?? undefined, mobile_number: lead.phone ?? undefined, company: lead.company ?? undefined, lead_source: "Elevated", notifications_enabled: false }),
     });
     return res?.id ?? null;
+  },
+  find: hcpFind,
+  async track(c, id) {
+    const res = await hcp(c, `/jobs?customer_id=${encodeURIComponent(id)}&page_size=50`);
+    const deals: Deal[] = (res.jobs ?? []).map((j: any) => {
+      const s = String(j.work_status ?? "").toLowerCase();
+      return { status: /complete/.test(s) ? "WON" : /cancel/.test(s) ? "LOST" : "OPEN", cents: Math.round(Number(j.total_amount ?? 0)), at: parseDate(j.work_timestamps?.completed_at ?? j.created_at), stage: `Job ${s.replace(/_/g, " ")}` };
+    });
+    return combine("NEW", null, deals);
   },
 };
 

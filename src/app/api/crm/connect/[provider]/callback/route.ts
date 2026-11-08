@@ -2,7 +2,7 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireBusiness } from "@/lib/auth";
-import { CONNECTORS, CRM_OAUTH_COOKIE, exchangeCrmCode, isCrmProvider, saveCrmConnection, syncCrm } from "@/lib/crm";
+import { CONNECTORS, CRM_OAUTH_COOKIE, exchangeCrmCode, isCrmProvider, saveCrmConnection } from "@/lib/crm";
 
 export const maxDuration = 300;
 
@@ -29,8 +29,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ provider: strin
     // Zoho tells us which data centre the account lives in.
     const extra = provider === "ZOHO" && url.searchParams.get("accounts-server") ? { accountsServer: url.searchParams.get("accounts-server") } : {};
     const t = await exchangeCrmCode(provider, url.searchParams.get("code") ?? "", extra);
-    const conn = await saveCrmConnection(business.id, provider, { method: "oauth", accessToken: t.accessToken, refreshToken: t.refreshToken, expiresAt: t.expiresAt, extra: t.extra });
-    await syncCrm(conn).catch(() => {});
+    await saveCrmConnection(business.id, provider, { method: "oauth", accessToken: t.accessToken, refreshToken: t.refreshToken, expiresAt: t.expiresAt, extra: t.extra });
   } catch (err) {
     message = err instanceof Error ? err.message : "Connection failed";
   }

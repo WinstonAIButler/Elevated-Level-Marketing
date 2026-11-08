@@ -42,7 +42,7 @@ export default async function ResultsPage() {
 
       {!r.hasBaseline && (
         <div className="alert alert-info" style={{ marginBottom: 20 }}>
-          We don&apos;t have your “before” numbers yet. <Link href="/dashboard/leads/connect">Import your past leads and customers or connect your CRM</Link> so we can show how much has changed.
+          We don&apos;t have your “before” numbers yet. <Link href="/dashboard/leads/connect">Connect your CRM and website form</Link> so we can show how much has changed.
         </div>
       )}
 
@@ -103,7 +103,7 @@ export default async function ResultsPage() {
             </tbody>
           </table>
         ) : (
-          <p className="muted">No new leads recorded yet. Add the website form or connect your CRM on <Link href="/dashboard/leads/connect">Import &amp; connect</Link>.</p>
+          <p className="muted">No new leads recorded yet. Add the website form or connect your CRM on <Link href="/dashboard/leads/connect">Connect</Link>.</p>
         )}
         <p className="small muted" style={{ marginTop: 12 }}>
           “Traced to Elevated” counts only leads that came through our tracked links, ads or form, or that you marked as from Elevated, so the return shown is conservative.
