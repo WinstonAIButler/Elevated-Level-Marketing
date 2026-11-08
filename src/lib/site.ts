@@ -7,9 +7,9 @@ export const SITE_URL = (process.env.APP_URL || "https://elevatedlevel.app").rep
 export const CONTACT_EMAIL = process.env.CONTACT_EMAIL || "support@elevatedlevel.app";
 
 export const SITE_DESCRIPTION =
-  "Elevated Digital Marketing is an AI-powered marketing service for small and mid-sized businesses. It scores your marketing, builds a 12-week plan, writes your campaigns and keeps producing new content every week.";
+  "Elevated Digital Marketing helps small and mid-sized businesses get recommended by AI assistants and Google. A free check shows where you stand; then Elevated builds your plan, writes and publishes your content every week, and runs your ads, with your approval on everything.";
 
-export const SITE_TAGLINE = "Marketing that runs itself";
+export const SITE_TAGLINE = "Get recommended by AI and Google";
 
 /** Answer-first FAQ. Rendered on the home page and emitted as FAQPage structured data. */
 export const FAQ: { q: string; a: string }[] = [
@@ -35,7 +35,15 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Does it help my business show up in AI search like ChatGPT and Google AI Overviews?",
-    a: "Yes. The website audit checks the signals AI assistants and search engines rely on, such as structured data, crawlability, clear page titles and an llms.txt file, and tells you exactly what to fix.",
+    a: "Yes, that's the core of it. The free visibility check runs the searches your customers would run and shows whether you're recommended and who is instead. Then the platform fixes the website signals AI relies on (structured data, crawlability, clear titles, an llms.txt file), keeps your Google Business Profile and social channels active with fresh posts, and re-checks your visibility every week.",
+  },
+  {
+    q: "Is the visibility check really free?",
+    a: "Yes. It takes about a minute, needs no account and no card, and you keep the report. If you sign up, it's saved to your account and used to build your plan.",
+  },
+  {
+    q: "Am I locked into a contract?",
+    a: "No. Plans are month to month and you can cancel online at any time. Your social, Google and Stripe accounts always stay yours.",
   },
   {
     q: "Do you guarantee results?",

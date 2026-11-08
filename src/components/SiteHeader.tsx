@@ -9,6 +9,7 @@ export async function SiteHeader() {
       <div className="container">
         <Logo />
         <nav>
+          <Link href="/check" className="hide-sm">Free AI check</Link>
           <Link href="/#how" className="hide-sm">How it works</Link>
           <Link href="/#pricing" className="hide-sm">Pricing</Link>
           {user ? (
