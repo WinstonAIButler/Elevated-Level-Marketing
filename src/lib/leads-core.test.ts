@@ -95,5 +95,6 @@ describe("resultsSummary", () => {
     expect(r.hasBaseline).toBe(false);
     expect(r.leadChangePct).toBeNull();
     expect(r.roi).toBeNull();
+    expect(r.costPerLeadCents).toBeNull();
   });
 });

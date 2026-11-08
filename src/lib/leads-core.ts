@@ -284,7 +284,7 @@ export function resultsSummary(leads: ResultLead[], opts: { startedAt: Date; now
     spendCents: opts.spendCents,
     // Return on spend counts only revenue we can trace to Elevated's work.
     roi: opts.spendCents > 0 ? Math.round((elevatedRevenue / opts.spendCents) * 100) / 100 : null,
-    costPerLeadCents: elevatedLeads.length ? Math.round(opts.spendCents / elevatedLeads.length) : null,
+    costPerLeadCents: elevatedLeads.length && opts.spendCents > 0 ? Math.round(opts.spendCents / elevatedLeads.length) : null,
     bySource: [...bySource.entries()].map(([source, v]) => ({ source, ...v })).sort((a, b) => b.leads - a.leads),
   };
 }
