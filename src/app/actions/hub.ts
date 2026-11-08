@@ -6,6 +6,9 @@ import { requireOwner } from "@/lib/auth";
 import { CHANNELS, isProvider } from "@/lib/channels";
 import { publishItem } from "@/lib/publishing";
 import { logActivity } from "@/lib/usage";
+import { redirect } from "next/navigation";
+import { generateSalesBrief, runVisibilityCheck } from "@/lib/visibility";
+import type { FormState } from "./auth";
 
 /** The team published an item by hand: record it as live for the client. */
 export async function markPublished(form: FormData) {
@@ -46,4 +49,41 @@ export async function confirmAccess(form: FormData) {
   await db.channelConnection.update({ where: { id: conn.id }, data: { extra: extra as Prisma.InputJsonValue } });
   await logActivity(businessId, "channels", `Elevated confirmed access to your ${CHANNELS[provider].name} account`);
   revalidatePath("/hub");
+}
+
+/** Owner runs a visibility check on a prospect they're talking to, then gets the brief. */
+export async function assessProspect(_: FormState, form: FormData): Promise<FormState> {
+  await requireOwner();
+  const get = (k: string) => String(form.get(k) ?? "").trim();
+  const input = { website: get("website"), businessName: get("businessName"), city: get("city"), industry: get("industry"), email: get("email") || undefined };
+  if (!input.website || input.businessName.length < 2 || input.city.length < 2 || input.industry.length < 2) {
+    return { error: "Fill in the website, business name, city and what they do." };
+  }
+  let id: string;
+  try {
+    id = await runVisibilityCheck(input, "owner", { owner: true });
+    await generateSalesBrief(id);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "The assessment couldn't run." };
+  }
+  redirect(`/hub/sales/${id}`);
+}
+
+export async function refreshBrief(_: FormState, form: FormData): Promise<FormState> {
+  await requireOwner();
+  try {
+    await generateSalesBrief(String(form.get("id")));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't write the brief." };
+  }
+  revalidatePath(`/hub/sales/${String(form.get("id"))}`);
+  return { ok: "Brief updated." };
+}
+
+export async function saveLeadNotes(_: FormState, form: FormData): Promise<FormState> {
+  await requireOwner();
+  const id = String(form.get("id"));
+  await db.visibilityCheck.update({ where: { id }, data: { salesNotes: String(form.get("notes") ?? "").slice(0, 5000) || null } });
+  revalidatePath(`/hub/sales/${id}`);
+  return { ok: "Notes saved." };
 }

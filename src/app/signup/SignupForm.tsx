@@ -6,11 +6,12 @@ import { FormMessage } from "@/components/FormMessage";
 import { SubmitButton } from "@/components/SubmitButton";
 import { PasswordInput } from "@/components/PasswordInput";
 
-export function SignupForm() {
+export function SignupForm({ check }: { check?: string }) {
   const [state, action] = useActionState(signup, undefined);
   return (
     <form action={action} className="stack">
       <FormMessage state={state} />
+      {check && <input type="hidden" name="check" value={check} />}
       <div className="field">
         <label htmlFor="name">Your name</label>
         <input id="name" name="name" type="text" autoComplete="name" required />

@@ -319,3 +319,136 @@ export async function adCreative(
   }
   return { creative, ai: true };
 }
+
+// ---------------------------------------------------------------------------
+// AI search visibility test: does the business come up when customers ask an AI
+// assistant? Claude runs real web searches the way an assistant would and reports
+// who it would recommend.
+
+export const AiVisibility = z.object({
+  queries: z
+    .array(
+      z.object({
+        query: z.string(),
+        mentioned: z.boolean(),
+        rank: z.number().nullable(),
+        recommended: z.array(z.string()),
+      }),
+    )
+    .min(1),
+  competitors: z.array(z.object({ name: z.string(), why: z.string() })),
+  summary: z.string(),
+  reasons: z.array(z.string()),
+});
+export type AiVisibility = z.infer<typeof AiVisibility>;
+
+export function aiVisibilityScore(r: AiVisibility) {
+  const per: number[] = r.queries.map((q) => (!q.mentioned ? 0 : q.rank === 1 ? 100 : q.rank && q.rank <= 3 ? 80 : 55));
+  return Math.round(per.reduce((a, b) => a + b, 0) / per.length);
+}
+
+export async function aiVisibilityTest(input: { businessName: string; domain: string; city: string; industry: string }) {
+  if (!aiEnabled()) return null;
+  const system = `You test how visible a local business is when potential customers ask AI assistants and search engines for recommendations. Be factual: only name businesses that actually appear in your search results. Never invent rankings or businesses.`;
+  const prompt = `Business: ${input.businessName}
+Website: ${input.domain}
+Location: ${input.city}
+What they do: ${input.industry}
+
+1. Write 3 realistic questions a potential customer in ${input.city} would ask an AI assistant when looking for this kind of business. Don't use the business's name. Mix a "best ${input.industry} in ${input.city}" style question with more specific needs.
+2. For each question, use web search the way an AI assistant would, and decide which businesses you would recommend (up to 5, best first).
+3. For each question, note whether ${input.businessName} (or ${input.domain}) is among them and at what rank.
+4. List the competitors that come up most and briefly why they appear (reviews, listings, content, directories).
+5. Give 2-4 likely reasons ${input.businessName} is or isn't showing up.
+
+Reply with only this JSON inside <result></result> tags:
+{"queries":[{"query":"...","mentioned":false,"rank":null,"recommended":["..."]}],"competitors":[{"name":"...","why":"..."}],"summary":"2 sentences for the business owner","reasons":["..."]}`;
+
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
+  let text = "";
+  try {
+    for (let turn = 0; turn < 4; turn++) {
+      const res = await anthropic().beta.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        output_config: { effort: "low" },
+        system,
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }],
+        messages,
+      });
+      if (res.stop_reason === "refusal") return null;
+      text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+      if (res.stop_reason !== "pause_turn") break;
+      messages.push({ role: "assistant", content: res.content });
+    }
+  } catch (err) {
+    throw friendlyAiError(err);
+  }
+  const json = text.match(/<result>([\s\S]*?)<\/result>/)?.[1] ?? text.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) return null;
+  const parsed = AiVisibility.safeParse(JSON.parse(json));
+  return parsed.success ? parsed.data : null;
+}
+
+// ---------------------------------------------------------------------------
+// Sales brief for the owner (Owners Hub → Sales)
+
+const Phase = z.object({
+  focus: z.string().describe("One line: what this phase is about"),
+  actions: z.array(z.string()).describe("3-5 concrete things Elevated's platform and team do in this phase, named after real features: AI plan, weekly content batches, approvals, Google Business Profile posts, Meta/Google ads from the wallet, website & AI visibility fixes, budget split by performance"),
+  targets: z.array(z.string()).describe("2-4 measurable targets to aim for, phrased as targets or leading indicators, never guarantees (e.g. 'Appear in at least 1 of 3 AI searches', 'Google Business Profile posting weekly')"),
+});
+
+export const SalesBriefOutput = z.object({
+  headline: z.string().describe("One sentence the owner can open the sales call with"),
+  weaknesses: z.array(z.object({ area: z.string(), finding: z.string(), impact: z.string().describe("What it likely costs them, in plain words") })).describe("3-5, most important first, based only on the check results given"),
+  needs: z.array(z.string()).describe("3-5 likely needs or goals to confirm on the call"),
+  recommendedTier: z.enum(["STARTER", "GROWTH", "ELITE"]),
+  tierReason: z.string(),
+  suggestedMonthlyAdBudget: z.number().int().describe("USD per month, realistic for this kind of local business; 0 if ads aren't a fit yet"),
+  day30: Phase,
+  day60: Phase,
+  day90: Phase,
+  talkingPoints: z.array(z.string()).describe("4-6 short points for the call"),
+  objections: z.array(z.object({ objection: z.string(), response: z.string() })).describe("3-4 likely objections with honest responses"),
+});
+export type SalesBriefOutput = z.infer<typeof SalesBriefOutput>;
+
+export async function salesBrief(input: {
+  businessName: string;
+  domain: string;
+  city: string;
+  industry: string;
+  siteScore: number | null;
+  aiScore: number | null;
+  failedChecks: { label: string; detail: string }[];
+  ai: AiVisibility | null;
+  prices: Record<"STARTER" | "GROWTH" | "ELITE", number>;
+}): Promise<{ brief: SalesBriefOutput; ai: boolean }> {
+  if (!aiEnabled()) return { brief: demo.salesBrief(input), ai: false };
+  const aiText = input.ai
+    ? `AI search test (score ${input.aiScore}/100):\n${input.ai.queries
+        .map((q) => `- "${q.query}": ${q.mentioned ? `shown at #${q.rank ?? "?"}` : "not shown"}; recommended: ${q.recommended.join(", ")}`)
+        .join("\n")}\nCompetitors: ${input.ai.competitors.map((c) => `${c.name} (${c.why})`).join("; ")}\nReasons: ${input.ai.reasons.join("; ")}`
+    : "AI search test: not available.";
+  const brief = await generate(
+    SalesBriefOutput,
+    `Write a sales brief for Elevated's owner, who is about to pitch this prospect. Be specific to their results and honest: no guaranteed outcomes, no invented numbers about the prospect.
+
+Prospect: ${input.businessName} (${input.domain}), ${input.industry} in ${input.city}
+Website score: ${input.siteScore ?? "not checked"}/100
+Failed website checks:
+${input.failedChecks.map((c) => `- ${c.label}: ${c.detail}`).join("\n") || "- none recorded"}
+${aiText}
+
+Elevated plans (monthly, ad spend separate):
+- Starter $${input.prices.STARTER}: assessment, 12-week AI plan, 8 AI campaigns/mo, weekly autopilot content, 60 AI images, 12% ad management fee
+- Growth $${input.prices.GROWTH}: everything in Starter, 30 campaigns/mo, ad budget split across channels by performance, 200 images, 10% ad fee
+- Elite $${input.prices.ELITE}: everything in Growth, up to 200 campaigns, monthly strategy review with the Elevated team, TikTok/LinkedIn/X ads run by the team, 500 images, 8% ad fee
+
+Lay out what Elevated would do in the first 30, 60 and 90 days using the platform, building on each phase.`,
+  );
+  return { brief, ai: true };
+}

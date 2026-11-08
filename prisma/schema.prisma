@@ -349,3 +349,31 @@ model MediaAsset {
 
   @@index([businessId, createdAt])
 }
+
+// Free website + AI visibility check run by prospects before (or while) signing up.
+// Doubles as the lead list in the Owners Hub.
+model VisibilityCheck {
+  id           String    @id @default(cuid())
+  url          String
+  domain       String
+  businessName String
+  city         String
+  industry     String
+  email        String?
+  siteScore    Int?
+  checks       Json? // rule-based website checks (site-audit.ts)
+  aiScore      Int?
+  ai           Json? // AI search test: queries, whether the business appeared, competitors
+  error        String?
+  ipHash       String
+  businessId   String? // set when the prospect signs up
+  source       String    @default("public") // public (ran it themselves) | owner (run from the Owners Hub)
+  salesBrief   Json? // AI sales brief for the owner: weaknesses, needs, plan fit, 30/60/90 days
+  salesBriefAt DateTime?
+  salesNotes   String? // the owner's own notes on the lead
+  createdAt    DateTime  @default(now())
+
+  @@index([domain, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([createdAt])
+}

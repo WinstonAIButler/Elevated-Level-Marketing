@@ -84,6 +84,7 @@ export default async function Home() {
             </p>
             <div className="row" style={{ marginTop: 28 }}>
               <Link href="/signup" className="btn btn-primary btn-lg">Start Free Assessment</Link>
+              <Link href="/check" className="btn btn-ghost btn-lg btn-on-dark">Free AI Visibility Check</Link>
               <Link href="#how" className="btn btn-ghost btn-lg btn-on-dark">See How It Works</Link>
             </div>
             <p className="small hero-note">Free trial · No card required · Cancel anytime</p>
