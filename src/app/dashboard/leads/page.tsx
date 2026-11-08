@@ -72,7 +72,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <button className="btn btn-ghost btn-sm">Filter</button>
           </form>
           {leads.length ? (
-            <table className="simple">
+            <table className="simple leads-table">
               <thead><tr><th>Lead</th><th>Source</th><th>Status &amp; value</th><th></th></tr></thead>
               <tbody>
                 {leads.map((l) => (
