@@ -50,15 +50,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <div className="card" style={{ marginBottom: 20 }} id="stripe">
         <div className="row between">
-          <h2 style={{ margin: 0 }}>Stripe account</h2>
+          <h2 style={{ margin: 0 }}>Stripe account <span className="small muted" style={{ fontWeight: 400 }}>(optional)</span></h2>
           <span className={`badge ${stripeState === "active" ? "badge-good" : stripeState === "none" ? "badge-dark" : "badge-warn"}`}>
             {{ none: "Not set up", incomplete: "Setup not finished", review: "In review with Stripe", active: "Active" }[stripeState]}
           </span>
         </div>
         <p className="muted" style={{ marginTop: 10 }}>
-          Your own Stripe account for taking payments from your customers, set up through Elevated. It belongs to you: you log
-          in to Stripe directly, payouts go to your bank, and Stripe&apos;s fees are charged to your account. Being connected to
-          Elevated lets us show the sales your marketing brings in.
+          Only needed if you want to take card payments from your customers through a Stripe account set up via Elevated. You
+          don&apos;t need it to see your results: we track those from your leads and CRM on the{" "}
+          <Link href="/dashboard/results">Results</Link> page. The account belongs to you: you log in to Stripe directly, payouts
+          go to your bank, and Stripe&apos;s fees are charged to your account.
         </p>
         {stripeState === "active" && sales && (
           <div className="row" style={{ gap: 32, margin: "8px 0 16px" }}>

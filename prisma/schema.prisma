@@ -84,6 +84,10 @@ model Business {
   stripeDetailsSubmitted Boolean             @default(false)
   stripeChargesEnabled   Boolean             @default(false)
   stripeCheckedAt        DateTime?
+  // Leads & Results
+  leadFormKey            String              @unique @default(cuid()) // public key for the website form / webhook
+  leads                  Lead[]
+  crmConnections         CrmConnection[]
 }
 
 model Assessment {
@@ -376,4 +380,74 @@ model VisibilityCheck {
   @@index([domain, createdAt])
   @@index([ipHash, createdAt])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Leads & Results: every lead and customer, where they came from and what they were worth.
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  WON
+  LOST
+}
+
+enum CrmProvider {
+  HUBSPOT
+  PIPEDRIVE
+  ZOHO
+  JOBBER
+  HOUSECALL_PRO
+}
+
+model Lead {
+  id           String       @id @default(cuid())
+  businessId   String
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  company      String?
+  // Channel it came from: google, google_ads, google_business, facebook, instagram, linkedin,
+  // x, tiktok, website, ai_search, referral, email, other. "elevated" is true when the lead
+  // came through something Elevated published (tracked link, Elevated form, our ads).
+  source       String       @default("other")
+  sourceDetail String? // campaign or page, e.g. utm_campaign
+  elevated     Boolean      @default(false)
+  status       LeadStatus   @default(NEW)
+  valueCents   Int          @default(0)
+  wonAt        DateTime?
+  notes        String?
+  origin       String       @default("manual") // manual | form | webhook | import | crm
+  crm          CrmProvider?
+  externalId   String? // id in the client's CRM
+  occurredAt   DateTime     @default(now()) // when the lead first came in (original date for imports)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([businessId, crm, externalId])
+  @@index([businessId, occurredAt])
+  @@index([businessId, email])
+}
+
+// A client's CRM. Tokens are AES-256-GCM encrypted (src/lib/crypto.ts).
+model CrmConnection {
+  id              String      @id @default(cuid())
+  businessId      String
+  business        Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  provider        CrmProvider
+  method          String // oauth | token
+  accessTokenEnc  String
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  extra           Json? // e.g. Zoho/Pipedrive API domain
+  accountName     String?
+  pushNewLeads    Boolean     @default(true)
+  status          String      @default("active") // active | error
+  lastSyncAt      DateTime?
+  lastSyncCount   Int?
+  lastError       String?
+  createdAt       DateTime    @default(now())
+
+  @@unique([businessId, provider])
 }

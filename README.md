@@ -118,6 +118,18 @@ Every platform needs a developer app. Register `<APP_URL>/api/connect/<provider>
 
 Check `/api/health` for what's configured. Until a platform's app is set, its Connect button shows "Coming soon".
 
+## Leads & Results
+
+Clients see what Elevated earns them at **Results** (`/dashboard/results`): before vs since Elevated for website/AI
+visibility, leads per week, new customers, revenue, and return on spend (revenue traced to Elevated ÷ plan + ad spend).
+
+Where leads come from (`/dashboard/leads`, `/dashboard/leads/connect`):
+- **Tracked links:** every link Elevated publishes carries `utm_source`/`utm_medium`/`utm_campaign=elevated-…`.
+- **Website snippet** `public/lead-form.js`: remembers the first tracked link a visitor arrived from, copies submissions of the site's existing forms (`data-capture="true"`), and renders a form in `<div id="elevated-lead-form">`.
+- **Webhook** `POST /api/leads/<leadFormKey>` (JSON or form fields) for Zapier, Typeform, Jotform etc. CORS-open, honeypot, 60/hour per business.
+- **Spreadsheet import** with column matching (`src/lib/leads-core.ts`, unit-tested).
+- **CRM connectors** (`src/lib/crm/`): HubSpot (private app token or OAuth), Pipedrive (API token or OAuth), Zoho CRM (OAuth), Jobber (OAuth, import only), Housecall Pro (API key). Each imports contacts plus won deals / paid jobs, re-syncs daily (`/api/cron/crm-sync`), and pushes new Elevated leads into the CRM where supported.
+
 ## Project layout
 
 ```

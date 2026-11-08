@@ -37,6 +37,12 @@ export default async function OwnersHub() {
   ]);
 
   const live = await livePrices();
+  const [leads30, won30] = await Promise.all([
+    db.lead.groupBy({ by: ["businessId"], where: { occurredAt: { gte: since30 } }, _count: true }),
+    db.lead.groupBy({ by: ["businessId"], where: { status: "WON", wonAt: { gte: since30 } }, _count: true, _sum: { valueCents: true } }),
+  ]);
+  const leadsByBiz = new Map(leads30.map((l) => [l.businessId, l._count]));
+  const wonByBiz = new Map(won30.map((w) => [w.businessId, { n: w._count, cents: w._sum.valueCents ?? 0 }]));
   const lastByBusiness = new Map(lastActivity.map((a) => [a.businessId, a._max.createdAt]));
   const paying = users.filter((u) => u.tier !== "TRIAL" && (u.subscriptionStatus === "active" || u.subscriptionStatus === "trialing"));
   const mrr = paying.reduce((sum, u) => sum + (live[u.tier] ? live[u.tier]!.cents / 100 : TIERS[u.tier].price), 0);
@@ -190,7 +196,7 @@ export default async function OwnersHub() {
       <div className="card" style={{ marginBottom: 20 }} id="clients">
         <h2>Clients</h2>
         <table className="simple">
-          <thead><tr><th>Business</th><th>Owner</th><th>Plan</th><th>Wallet</th><th>Channels</th><th>Stripe</th><th>Last active</th></tr></thead>
+          <thead><tr><th>Business</th><th>Owner</th><th>Plan</th><th>Results, 30 days</th><th>Wallet</th><th>Channels</th><th>Last active</th></tr></thead>
           <tbody>
             {users.map((u) => {
               const b = u.business;
@@ -200,9 +206,11 @@ export default async function OwnersHub() {
                   <td><strong>{b?.name ?? "No business profile yet"}</strong><div className="small muted">{b?.industry}{b?.location ? ` · ${b.location}` : ""}</div></td>
                   <td className="small">{u.name}<div className="muted">{u.email}</div></td>
                   <td className="small">{TIERS[u.tier].name}{u.subscriptionStatus && u.tier !== "TRIAL" ? <div className="muted">{u.subscriptionStatus}</div> : null}<div className="muted">joined {formatDate(u.createdAt)}</div></td>
+                  <td className="small">
+                    {b ? <>{leadsByBiz.get(b.id) ?? 0} leads · {wonByBiz.get(b.id)?.n ?? 0} won<div className="muted">{usd(wonByBiz.get(b.id)?.cents ?? 0)} revenue</div></> : "–"}
+                  </td>
                   <td className="small">{b ? usd(b.walletBalanceCents, 2) : "–"}<div className="muted">{b?.adSpendMode === "OWN_ACCOUNTS" ? "own accounts" : b ? `$${b.monthlyBudget.toLocaleString()}/mo budget` : ""}</div></td>
                   <td className="small">{channels} / 6</td>
-                  <td className="small">{!b?.stripeAccountId ? "–" : b.stripeChargesEnabled ? "Active" : b.stripeDetailsSubmitted ? "In review" : "Setup not finished"}</td>
                   <td className="small">{b && lastByBusiness.get(b.id) ? formatDate(lastByBusiness.get(b.id)!) : "–"}</td>
                 </tr>
               );

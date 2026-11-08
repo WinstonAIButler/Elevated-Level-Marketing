@@ -15,6 +15,8 @@ const htmlLimitedBots =
 const nextConfig = {
   poweredByHeader: false,
   htmlLimitedBots,
+  // Spreadsheet imports send their rows through a server action (Vercel caps requests at 4.5 MB).
+  experimental: { serverActions: { bodySizeLimit: "4mb" } },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
