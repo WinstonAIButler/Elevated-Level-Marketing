@@ -1,4 +1,6 @@
+import { displayPrices } from "@/lib/stripe-prices";
 import type { Metadata } from "next";
+import type { Tier } from "@prisma/client";
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -7,6 +9,8 @@ import { FAQ, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import { AD_SPEND_NOTE, PAID_TIERS, TIERS } from "@/lib/tiers";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
+// Re-render every 5 minutes so plan prices follow Stripe.
+export const revalidate = 300;
 
 const STEPS = [
   { title: "Tell us about your business", body: "A five-minute profile: what you sell, who you sell to, your goals and your budget." },
@@ -26,7 +30,7 @@ const FEATURES = [
 
 const AUDIENCES = ["Home services", "Clinics & dental", "Restaurants & cafés", "Retail & e-commerce", "Fitness & wellness", "Professional services"];
 
-const structuredData = {
+const structuredData = (prices: Record<Tier, number>) => ({
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -41,12 +45,12 @@ const structuredData = {
       offers: [TIERS.TRIAL, ...PAID_TIERS].map((t) => ({
         "@type": "Offer",
         name: t.name,
-        price: t.price,
+        price: prices[t.id],
         priceCurrency: "USD",
         description: t.features.join(", "),
         url: `${SITE_URL}/signup`,
-        ...(t.price > 0 && {
-          priceSpecification: { "@type": "UnitPriceSpecification", price: t.price, priceCurrency: "USD", unitCode: "MON", referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" } },
+        ...(prices[t.id] > 0 && {
+          priceSpecification: { "@type": "UnitPriceSpecification", price: prices[t.id], priceCurrency: "USD", unitCode: "MON", referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" } },
         }),
       })),
     },
@@ -56,13 +60,14 @@ const structuredData = {
       mainEntity: FAQ.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
     },
   ],
-};
+});
 
-export default function Home() {
+export default async function Home() {
+  const prices = await displayPrices();
   return (
     <>
       <SiteHeader />
-      <JsonLd data={structuredData} />
+      <JsonLd data={structuredData(prices)} />
       <main id="main">
         <section className="hero">
           <div className="container">
@@ -136,7 +141,7 @@ export default function Home() {
                 <div className={`card ${t.id === "GROWTH" ? "featured" : ""}`} key={t.id}>
                   {t.id === "GROWTH" && <span className="badge badge-good">Most popular</span>}
                   <h3 style={{ marginTop: 8 }}>{t.name}</h3>
-                  <div className="price">${t.price}<small>/month</small></div>
+                  <div className="price">${prices[t.id].toLocaleString()}<small>/month</small></div>
                   <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ ad spend, at the budget you set</p>
                   <p className="muted small">{t.tagline}</p>
                   <ul className="feature-list">{t.features.map((f) => <li key={f}>{f}</li>)}</ul>

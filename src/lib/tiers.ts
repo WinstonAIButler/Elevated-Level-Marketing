@@ -3,12 +3,14 @@ import type { Tier } from "@prisma/client";
 export type TierInfo = {
   id: Tier;
   name: string;
+  /** List price in dollars; the live price shown to clients comes from Stripe when set up. */
   price: number;
   tagline: string;
   features: string[];
   limits: { campaignsPerMonth: number; plansPerMonth: number; assessmentsPerMonth: number; imagesPerMonth: number };
   /** Management fee on ad-wallet top-ups, percent of the ad amount. Lower on higher plans. */
   adFeePercent: number;
+  /** Optional manual override; normally the price is found in Stripe (src/lib/stripe-prices.ts). */
   stripePriceEnv?: string;
 };
 
@@ -80,10 +82,3 @@ export const AD_SPEND_NOTE =
   "Ad spend is not included. You set the budget and approve how it's split, then either add it to your Elevated ad wallet or connect your own Google and Meta ad accounts.";
 
 export const PAID_TIERS = [TIERS.STARTER, TIERS.GROWTH, TIERS.ELITE];
-
-export function tierForStripePrice(priceId: string): Tier | null {
-  for (const tier of PAID_TIERS) {
-    if (tier.stripePriceEnv && process.env[tier.stripePriceEnv] === priceId) return tier.id;
-  }
-  return null;
-}

@@ -7,6 +7,7 @@ import { requireBusiness, requireUser } from "@/lib/auth";
 import { runAutopilot } from "@/lib/autopilot";
 import { appUrl, stripe, stripeEnabled } from "@/lib/stripe";
 import { TIERS } from "@/lib/tiers";
+import { priceIdForTier } from "@/lib/stripe-prices";
 
 export async function toggleAutopilot() {
   const user = await requireUser();
@@ -23,7 +24,7 @@ export async function runAutopilotNow() {
 export async function startCheckout(form: FormData) {
   const user = await requireUser();
   const tier = TIERS[String(form.get("tier")) as Tier];
-  const price = tier?.stripePriceEnv ? process.env[tier.stripePriceEnv] : undefined;
+  const price = tier && tier.id !== "TRIAL" && stripeEnabled() ? await priceIdForTier(tier.id) : null;
   if (!stripeEnabled() || !price) redirect("/dashboard/billing?error=not-configured");
   // Existing subscribers change plans in the Stripe portal so they never end up with two subscriptions.
   if (user.stripeCustomerId && user.tier !== "TRIAL") return openBillingPortal();

@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
-import { tierForStripePrice } from "@/lib/tiers";
+import { tierForPrice } from "@/lib/stripe-prices";
 import { recordWalletEntry } from "@/lib/wallet";
 import { logActivity } from "@/lib/usage";
 
@@ -48,9 +48,9 @@ export async function POST(req: Request) {
     case "customer.subscription.deleted": {
       const sub = event.data.object;
       const userId = sub.metadata?.userId;
-      const priceId = sub.items.data[0]?.price.id;
+      const price = sub.items.data[0]?.price;
       const active = sub.status === "active" || sub.status === "trialing";
-      const tier = active && priceId ? tierForStripePrice(priceId) ?? "TRIAL" : "TRIAL";
+      const tier = active && price ? (await tierForPrice(price)) ?? "TRIAL" : "TRIAL";
       const customer = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
       await db.user.updateMany({
         where: userId ? { id: userId } : { stripeCustomerId: customer },
