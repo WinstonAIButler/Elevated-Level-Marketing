@@ -20,14 +20,14 @@ const FIELDS: FieldDef[] = [
   { name: "monthlyBudget", label: "Monthly ad & tools budget (USD)", hint: "What you can spend on ads and tools, not counting your Elevated plan.", type: "number", inputMode: "numeric" },
 ];
 
-export function BusinessForm({ business }: { business: Business | null }) {
+export function BusinessForm({ business, defaults }: { business: Business | null; defaults?: Partial<Record<keyof Business, string>> }) {
   const [state, action] = useActionState(saveBusiness, undefined);
   return (
     <form action={action} className="stack">
       <FormMessage state={state} />
       <div className="grid grid-2">
         {FIELDS.map((f) => {
-          const value = business?.[f.name];
+          const value = business ? business[f.name] : defaults?.[f.name];
           const defaultValue = value === null || value === undefined ? "" : String(value);
           return (
             <div className="field" key={f.name} style={f.long ? { gridColumn: "1 / -1" } : undefined}>

@@ -3,7 +3,7 @@
 // the AI schemas in ai.ts.
 import type { Business } from "@prisma/client";
 import { CATEGORIES, type CategoryId, type CategoryScores, weakestCategories } from "./assessment";
-import type { AdCreativeOutput, AssessmentInsight, CampaignBrief, CampaignOutput, PlanOutput } from "./ai";
+import type { AdCreativeOutput, AssessmentInsight, CampaignBrief, CampaignOutput, PlanOutput, SalesBriefOutput } from "./ai";
 
 const PLAYBOOK: Record<CategoryId, { fix: string; detail: string; channel: string; tasks: [string, string][] }> = {
   website: {
@@ -234,5 +234,21 @@ export function adCreative(b: Business, provider: string, source: CampaignOutput
     callToAction: "LEARN_MORE",
     keywords: google ? [`${b.industry}${city}`.toLowerCase(), `${b.industry} near me`.toLowerCase(), `${b.industry} company`.toLowerCase(), `${b.industry} services`.toLowerCase()] : [],
     imageIdea: `A bright photo of ${b.name}'s work or team, with the business name.`,
+  };
+}
+
+export function salesBrief(i: { businessName: string; city: string; industry: string; siteScore: number | null; aiScore: number | null; failedChecks: { label: string; detail: string }[] }): SalesBriefOutput {
+  return {
+    headline: `${i.businessName} is hard to find when people in ${i.city} look for a ${i.industry}, and that's fixable.`,
+    weaknesses: i.failedChecks.slice(0, 4).map((c) => ({ area: c.label, finding: c.detail, impact: "Fewer people find and choose the business online." })),
+    needs: ["More customers from search and AI assistants", "Consistent posting without spending their own time", "A clear budget for ads"],
+    recommendedTier: "GROWTH",
+    tierReason: "Covers several channels at once and splits the ad budget by what performs.",
+    suggestedMonthlyAdBudget: 500,
+    day30: { focus: "Foundation", actions: ["Assessment and 12-week plan", "Fix top website issues", "Weekly content batch and Google Business Profile posts"], targets: ["Top website fixes done", "Posting every week"] },
+    day60: { focus: "Reach", actions: ["Launch ads split across the best channels", "Keep weekly content going", "Re-check AI visibility"], targets: ["Ads live and tracked", "Visibility score improving"] },
+    day90: { focus: "Optimize", actions: ["Shift budget toward what works", "Refresh the plan", "Review results"], targets: ["Lower cost per lead than month one", "Showing up in more AI searches"] },
+    talkingPoints: ["Show them the AI search results", "Walk through the top website fixes", "Everything waits for their approval"],
+    objections: [{ objection: "I don't have time", response: "Autopilot writes the content; they just approve it." }],
   };
 }

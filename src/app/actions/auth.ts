@@ -1,4 +1,6 @@
 "use server";
+import { CHECK_COOKIE } from "@/lib/visibility";
+import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -25,6 +27,10 @@ export async function signup(_: FormState, form: FormData): Promise<FormState> {
     data: { name, email, passwordHash: await bcrypt.hash(password, 12) },
   });
   await startSession(user.id);
+  const check = String(form.get("check") ?? "");
+  if (/^c[a-z0-9]{20,30}$/.test(check)) {
+    (await cookies()).set(CHECK_COOKIE, check, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 14 });
+  }
   redirect("/dashboard/business?welcome=1");
 }
 
