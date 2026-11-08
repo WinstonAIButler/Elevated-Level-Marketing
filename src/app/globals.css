@@ -66,7 +66,7 @@ p { margin: 0 0 1em; }
 .field { display: grid; gap: 6px; }
 .field label, .label { font-weight: 600; font-size: 0.9rem; }
 .field .hint { font-size: 0.8rem; color: var(--muted); }
-input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="url"], textarea, select {
+input:not([type]), input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="url"], input[type="tel"], input[type="search"], textarea, select {
   width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
   font: inherit; background: #fff; color: var(--ink);
 }
@@ -256,7 +256,7 @@ fieldset .option + .option { margin-top: 8px; }
 .queue-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; background: #fff; }
 .queue-item + .queue-item { margin-top: 14px; }
 .queue-item textarea { min-height: 110px; }
-.preview { background: var(--bg); border-radius: 10px; padding: 12px; font-size: 0.9rem; white-space: pre-wrap; }
+.preview { background: var(--bg); border-radius: 10px; padding: 12px; font-size: 0.9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .kw { display: inline-block; background: var(--green-soft); border-radius: 999px; padding: 2px 10px; margin: 2px; font-size: 0.8rem; }
 .card table.simple { display: block; overflow-x: auto; }
 @media (min-width: 700px) { .card table.simple { display: table; } }
@@ -375,3 +375,18 @@ fieldset .option + .option { margin-top: 8px; }
   .card input:not([type="checkbox"]):not([type="radio"]), .card select, .card textarea { max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .burger i { transition: none; } }
+
+/* Leads table becomes a stack of cards on phones */
+@media (max-width: 700px) {
+  .card table.leads-table, .leads-table tbody { display: block; overflow: visible; }
+  .leads-table thead { display: none; }
+  .leads-table tr { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .leads-table td { display: block; padding: 0; border: 0; }
+  .leads-table td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .leads-table td:nth-child(4) { grid-column: 2; grid-row: 1; }
+  .leads-table td:nth-child(2) { grid-column: 1 / -1; }
+  .leads-table td:nth-child(3) { grid-column: 1 / -1; }
+  .leads-table td:nth-child(3) form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .leads-table td:nth-child(3) form > * { margin: 0; }
+  .leads-table td:nth-child(3) select { width: auto; flex: 1 1 120px; }
+}
