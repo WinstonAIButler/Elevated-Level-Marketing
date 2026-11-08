@@ -37,6 +37,7 @@ export default async function Overview() {
     db.channelConnection.findMany({ where: { businessId: business.id, status: { in: ["active", "linked"] } }, select: { provider: true } }),
     db.budgetAllocation.findFirst({ where: { businessId: business.id, status: { in: ["PROPOSED", "APPROVED"] } }, orderBy: { createdAt: "desc" } }),
   ]);
+  const leadCount = await db.lead.count({ where: { businessId: business.id } });
 
   const done = plan?.tasks.filter((t) => t.status === "DONE").length ?? 0;
   const total = plan?.tasks.length ?? 0;
@@ -50,7 +51,7 @@ export default async function Overview() {
     { done: Boolean(assessment), href: "/dashboard/assessment", label: "Take your marketing assessment" },
     { done: Boolean(plan), href: "/dashboard/plan", label: "Get your 12-week marketing plan" },
     { done: connections.length > 0, href: "/dashboard/channels", label: "Add your social and Google accounts" },
-    { done: business.stripeChargesEnabled, href: "/dashboard/settings#stripe", label: business.stripeAccountId ? "Finish setting up your Stripe account" : "Set up your Stripe account" },
+    { done: leadCount > 0, href: "/dashboard/leads/connect", label: "Import your customers or connect your CRM" },
     { done: Boolean(allocation), href: "/dashboard/ad-spend", label: "Set your ad budget" },
     { done: campaigns.length > 0, href: "/dashboard/campaigns/new", label: "Create your first campaign" },
   ];

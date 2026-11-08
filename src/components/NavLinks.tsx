@@ -9,6 +9,8 @@ const LINKS = [
   { href: "/dashboard/plan", label: "Marketing plan" },
   { href: "/dashboard/campaigns", label: "Campaigns" },
   { href: "/dashboard/approvals", label: "Approvals" },
+  { href: "/dashboard/results", label: "Results" },
+  { href: "/dashboard/leads", label: "Leads" },
   { href: "/dashboard/ad-spend", label: "Ad spend" },
   { href: "/dashboard/channels", label: "Channels" },
   { href: "/dashboard/website", label: "Website & AI visibility" },

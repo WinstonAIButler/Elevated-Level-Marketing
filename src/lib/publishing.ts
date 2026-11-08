@@ -5,6 +5,7 @@ import { adCreative, budgetAllocation, type CampaignOutput } from "./ai";
 import { dailyBudgetCents, looksB2B, maxChannels, normalizeSplits, proposeSplit, startOfMonth, type Split } from "./allocation";
 import { CHANNELS, PAID_PROVIDERS, USABLE_STATUSES, managedAdsConfigured, providerForPlatform } from "./channels";
 import { addDays } from "./format";
+import { tagLink, UTM_SOURCE } from "./leads-core";
 import { logActivity } from "./usage";
 import { recordWalletEntry } from "./wallet";
 import { fundedDays, LAUNCH_MIN_DAYS, LOW_BALANCE_DAYS } from "./wallet-math";
@@ -106,7 +107,7 @@ export async function approveAllocation(business: Business, allocationId: string
       primaryText: creative.primaryText,
       callToAction: creative.callToAction,
       keywords: creative.keywords,
-      link,
+      link: tagLink(link, UTM_SOURCE[split.provider] ?? split.provider.toLowerCase(), "cpc", creative.campaignName) ?? "",
       imageIdea: creative.imageIdea,
       reason: split.reason,
     };
@@ -167,7 +168,7 @@ export async function queueCampaignPosts(business: Business, campaign: Campaign)
       payload: {
         text: post.caption,
         hashtags: post.hashtags,
-        link,
+        link: tagLink(link, provider === "META" && /instagram|\big\b/i.test(post.platform) ? "instagram" : UTM_SOURCE[provider] ?? provider.toLowerCase(), "social", campaign.name),
         visualIdea: post.visualIdea,
         ...(provider === "META" ? { placement: /instagram|\big\b/i.test(post.platform) ? "instagram" : "facebook" } : {}),
       },
@@ -180,7 +181,7 @@ export async function queueCampaignPosts(business: Business, campaign: Campaign)
     items.push({
       provider: "GOOGLE_BUSINESS",
       title: `Google Business Profile update – ${campaign.name}`,
-      payload: { text: first.caption, link, visualIdea: first.visualIdea },
+      payload: { text: first.caption, link: tagLink(link, "google_business", "local", campaign.name), visualIdea: first.visualIdea },
       scheduledFor: start,
     });
   }
