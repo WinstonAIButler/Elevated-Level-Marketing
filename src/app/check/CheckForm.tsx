@@ -4,7 +4,7 @@ import { runCheck } from "@/app/actions/check";
 import { FormMessage } from "@/components/FormMessage";
 import { SubmitButton } from "@/components/SubmitButton";
 
-export function CheckForm() {
+export function CheckForm({ compact = false }: { compact?: boolean }) {
   const [state, action] = useActionState(runCheck, undefined);
   return (
     <form action={action} className="stack">
@@ -27,12 +27,14 @@ export function CheckForm() {
           <input id="industry" name="industry" type="text" placeholder="e.g. coffee shop, HVAC repair, dental clinic" required />
         </div>
       </div>
-      <div className="field">
-        <label htmlFor="email">Email (optional)</label>
-        <input id="email" name="email" type="email" autoComplete="email" placeholder="So we can send you the report" />
-      </div>
-      <SubmitButton className="btn btn-primary btn-lg" pendingText="Checking your website and asking AI search… (about a minute)">
-        Run my free check
+      {!compact && (
+        <div className="field">
+          <label htmlFor="email">Email (optional)</label>
+          <input id="email" name="email" type="email" autoComplete="email" placeholder="So we can send you the report" />
+        </div>
+      )}
+      <SubmitButton className={`btn btn-primary btn-lg${compact ? " btn-block" : ""}`} pendingText="Checking your website and asking AI search… (about a minute)">
+        {compact ? "Check my visibility, free" : "Run my free check"}
       </SubmitButton>
       <p className="small muted">We look at your public website and run a few real searches. Nothing is posted or changed.</p>
     </form>
