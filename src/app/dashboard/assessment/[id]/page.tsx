@@ -5,7 +5,7 @@ import { requireBusiness } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { CATEGORIES, type CategoryId, type CategoryScores } from "@/lib/assessment";
 import type { AssessmentInsight } from "@/lib/ai";
-import { BandBadge, ScoreBar, ScoreRing } from "@/components/Score";
+import { AssessmentOverview } from "@/components/AssessmentOverview";
 
 export const metadata = { title: "Assessment report" };
 
@@ -19,6 +19,11 @@ export default async function AssessmentReport({ params }: { params: Promise<{ i
 
   const scores = a.scores as CategoryScores;
   const recs = a.recommendations as AssessmentInsight["recommendations"];
+  const previous = await db.assessment.findFirst({
+    where: { businessId: business.id, createdAt: { lt: a.createdAt } },
+    orderBy: { createdAt: "desc" },
+    select: { overallScore: true },
+  });
   const hasPlan = await db.marketingPlan.count({ where: { businessId: business.id, active: true } });
 
   return (
@@ -31,34 +36,15 @@ export default async function AssessmentReport({ params }: { params: Promise<{ i
         <Link href="/dashboard/plan" className="btn btn-primary">{hasPlan ? "View marketing plan" : "Build my marketing plan"} →</Link>
       </div>
 
-      <div className="grid grid-2" style={{ marginBottom: 20 }}>
-        <div className="card row" style={{ gap: 24, alignItems: "flex-start", flexWrap: "nowrap" }}>
-          <ScoreRing score={a.overallScore} />
-          <div>
-            <h2>Overall score <BandBadge score={a.overallScore} /></h2>
-            <p style={{ margin: 0 }}>{a.summary}</p>
-          </div>
-        </div>
-        <div className="card">
-          <h2>Scores by area</h2>
-          <div className="stack">
-            {(Object.keys(CATEGORIES) as CategoryId[]).map((c) => (
-              <div key={c}>
-                <div className="row between small"><span>{CATEGORIES[c]}</span><strong>{scores[c]}</strong></div>
-                <ScoreBar score={scores[c]} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <AssessmentOverview score={a.overallScore} previousScore={previous?.overallScore ?? null} scores={scores} recommendations={recs} summary={a.summary} />
 
       <div className="grid grid-2" style={{ marginBottom: 20 }}>
         <div className="card">
-          <h2>Strengths</h2>
+          <h2 className="area-title good">Strengths</h2>
           <ul>{(a.strengths as string[]).map((s) => <li key={s}>{s}</li>)}</ul>
         </div>
         <div className="card">
-          <h2>Biggest gaps</h2>
+          <h2 className="area-title bad">Biggest gaps</h2>
           <ul>{(a.weaknesses as string[]).map((s) => <li key={s}>{s}</li>)}</ul>
         </div>
       </div>
