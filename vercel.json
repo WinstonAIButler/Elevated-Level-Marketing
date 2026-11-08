@@ -1,7 +1,20 @@
 {
   "crons": [
-    { "path": "/api/cron/autopilot", "schedule": "0 13 * * 1" },
-    { "path": "/api/cron/publish", "schedule": "5 * * * *" },
-    { "path": "/api/cron/spend-sync", "schedule": "30 */4 * * *" }
+    {
+      "path": "/api/cron/autopilot",
+      "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/cron/publish",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/spend-sync",
+      "schedule": "30 */4 * * *"
+    },
+    {
+      "path": "/api/cron/crm-sync",
+      "schedule": "15 9 * * *"
+    }
   ]
 }
