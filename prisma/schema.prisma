@@ -421,6 +421,9 @@ model Lead {
   origin       String       @default("manual") // manual | form | webhook | import | crm
   crm          CrmProvider?
   externalId   String? // id in the client's CRM
+  pushedAt     DateTime? // when Elevated sent it to the client's CRM
+  crmStage     String? // stage / status as the CRM names it, for display
+  trackedAt    DateTime? // last time we checked it in the CRM
   occurredAt   DateTime     @default(now()) // when the lead first came in (original date for imports)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -442,7 +445,7 @@ model CrmConnection {
   expiresAt       DateTime?
   extra           Json? // e.g. Zoho/Pipedrive API domain
   accountName     String?
-  pushNewLeads    Boolean     @default(true)
+  pushNewLeads    Boolean     @default(true) // send new Elevated leads automatically (otherwise "Send to CRM" by hand)
   status          String      @default("active") // active | error
   lastSyncAt      DateTime?
   lastSyncCount   Int?

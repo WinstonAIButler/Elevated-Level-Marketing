@@ -51,7 +51,7 @@ export default async function Overview() {
     { done: Boolean(assessment), href: "/dashboard/assessment", label: "Take your marketing assessment" },
     { done: Boolean(plan), href: "/dashboard/plan", label: "Get your 12-week marketing plan" },
     { done: connections.length > 0, href: "/dashboard/channels", label: "Add your social and Google accounts" },
-    { done: leadCount > 0, href: "/dashboard/leads/connect", label: "Import your customers or connect your CRM" },
+    { done: leadCount > 0, href: "/dashboard/leads/connect", label: "Connect your website form or CRM" },
     { done: Boolean(allocation), href: "/dashboard/ad-spend", label: "Set your ad budget" },
     { done: campaigns.length > 0, href: "/dashboard/campaigns/new", label: "Create your first campaign" },
   ];

@@ -1,11 +1,10 @@
-import { syncAllCrms } from "@/lib/crm";
+import { trackAllLeads } from "@/lib/crm";
 
 export const maxDuration = 300;
 
-// Daily: pull new contacts and won deals/jobs from every connected CRM.
+// Daily: follow every lead Elevated sent to a client CRM (stage, deals/jobs, won value).
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  const results = await syncAllCrms();
-  return Response.json({ synced: results.length, results });
+  return Response.json(await trackAllLeads());
 }

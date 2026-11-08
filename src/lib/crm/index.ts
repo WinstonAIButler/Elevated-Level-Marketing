@@ -4,7 +4,6 @@ import { db } from "../db";
 import { decrypt, encrypt } from "../crypto";
 import { appUrl } from "../stripe";
 import { form, fetchJson } from "../publishers/http";
-import { upsertCrmLeads } from "../leads";
 import { logActivity } from "../usage";
 import { CONNECTORS, type CrmConn } from "./providers";
 
@@ -132,53 +131,101 @@ export async function saveCrmConnection(
   return saved;
 }
 
-/** Pulls contacts and won deals/jobs from one CRM into the lead list. */
-export async function syncCrm(conn: CrmConnection) {
-  try {
-    const c = await live(conn);
-    const items = await CONNECTORS[conn.provider].pull(c);
-    const created = await upsertCrmLeads(conn.businessId, conn.provider, items);
-    await db.crmConnection.update({ where: { id: conn.id }, data: { lastSyncAt: new Date(), lastSyncCount: items.length, lastError: null, status: "active" } });
-    if (created) await logActivity(conn.businessId, "crm", `Synced ${CONNECTORS[conn.provider].name}: ${created} new contact${created === 1 ? "" : "s"}, ${items.length} total`);
-    return { total: items.length, created };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Sync failed";
-    await db.crmConnection.update({ where: { id: conn.id }, data: { lastError: message.slice(0, 500), status: "error" } });
-    throw new Error(`${CONNECTORS[conn.provider].name}: ${message}`);
-  }
-}
-
-/** Daily: sync every connected CRM. */
-export async function syncAllCrms() {
-  const conns = await db.crmConnection.findMany();
-  const results: { id: string; ok: boolean; detail: string }[] = [];
-  for (const c of conns) {
-    try {
-      const r = await syncCrm(c);
-      results.push({ id: c.id, ok: true, detail: `${r.total} records, ${r.created} new` });
-    } catch (err) {
-      results.push({ id: c.id, ok: false, detail: err instanceof Error ? err.message : "error" });
+/** Sends one lead to the business's CRM (or finds the person if they're already there) and starts following it. */
+export async function sendLeadToCrm(lead: Lead, connection?: CrmConnection) {
+  const conn =
+    connection ??
+    (await db.crmConnection.findFirst({ where: { businessId: lead.businessId, status: "active" }, orderBy: { createdAt: "asc" } }));
+  if (!conn) throw new Error("Connect a CRM first.");
+  const connector = CONNECTORS[conn.provider];
+  const c = await live(conn);
+  let externalId: string | null = null;
+  if (connector.push) {
+    externalId = await connector.push(c, { name: lead.name, email: lead.email, phone: lead.phone, company: lead.company, source: lead.source, notes: lead.notes });
+  } else if (connector.find && lead.email) {
+    externalId = await connector.find(c, lead.email);
+    if (!externalId) {
+      return { sent: false, reason: `${connector.name} can't receive new leads from Elevated. Add ${lead.name} in ${connector.name} with the same email and we'll start following them on the next check.` };
     }
   }
-  return results;
+  if (!externalId) throw new Error(`${connector.name} didn't return the new record.`);
+  await db.lead.update({ where: { id: lead.id }, data: { crm: conn.provider, externalId, pushedAt: new Date() } });
+  await logActivity(lead.businessId, "crm", `Sent ${lead.name} to ${connector.name}`);
+  return { sent: true as const };
 }
 
-/** Sends a newly captured lead to every connected CRM that accepts new leads. Best effort. */
-export async function pushLeadToCrms(businessId: string, lead: Lead) {
-  const conns = await db.crmConnection.findMany({ where: { businessId, pushNewLeads: true, status: "active" } });
+/** New lead captured by Elevated: send it right away if the client turned that on. */
+export async function autoSendLead(lead: Lead) {
+  const conn = await db.crmConnection.findFirst({ where: { businessId: lead.businessId, status: "active", pushNewLeads: true }, orderBy: { createdAt: "asc" } });
+  if (!conn) return;
+  try {
+    await sendLeadToCrm(lead, conn);
+  } catch (err) {
+    console.error(`Sending lead to ${conn.provider} failed`, err);
+    await db.crmConnection.update({ where: { id: conn.id }, data: { lastError: `Couldn't send ${lead.name}: ${err instanceof Error ? err.message : "error"}`.slice(0, 500) } });
+  }
+}
+
+/** Checks where one sent lead stands in the CRM and records any change. */
+export async function trackLead(lead: Lead, conn: CrmConnection) {
+  if (!lead.externalId) return null;
+  const t = await CONNECTORS[conn.provider].track(await live(conn), lead.externalId);
+  // "NEW" from the CRM just means nothing has happened there yet; don't undo a status
+  // or value someone set in Elevated. Real changes (contacted / won / lost) win.
+  if (t.status === "NEW" && lead.status !== "NEW") {
+    await db.lead.update({ where: { id: lead.id }, data: { crmStage: t.stage?.slice(0, 120) ?? lead.crmStage, trackedAt: new Date() } });
+    return t;
+  }
+  const becameCustomer = t.status === "WON" && lead.status !== "WON";
+  await db.lead.update({
+    where: { id: lead.id },
+    data: {
+      status: t.status,
+      // Keep a value someone typed in if the CRM has none.
+      valueCents: t.valueCents || (t.status === "WON" ? lead.valueCents : 0),
+      wonAt: t.status === "WON" ? lead.wonAt ?? t.wonAt ?? new Date() : null,
+      crmStage: t.stage?.slice(0, 120) ?? null,
+      trackedAt: new Date(),
+    },
+  });
+  if (becameCustomer) {
+    const value = t.valueCents || lead.valueCents;
+    await logActivity(lead.businessId, "leads", `${lead.name} became a customer${value ? ` ($${(value / 100).toLocaleString()})` : ""}, tracked in ${CONNECTORS[conn.provider].name}`);
+  }
+  return t;
+}
+
+/** Follows every lead Elevated sent to a CRM in the last year. Leads waiting on an import-only CRM are matched by email. */
+export async function trackAllLeads(businessId?: string) {
+  const conns = await db.crmConnection.findMany({ where: { status: { in: ["active", "error"] }, ...(businessId ? { businessId } : {}) } });
+  let checked = 0;
+  const errors: string[] = [];
   for (const conn of conns) {
     const connector = CONNECTORS[conn.provider];
-    if (!connector.push) continue;
-    try {
-      const externalId = await connector.push(await live(conn), {
-        name: lead.name, email: lead.email, phone: lead.phone, company: lead.company, source: lead.source, notes: lead.notes,
-      });
-      if (externalId && !lead.crm) {
-        await db.lead.update({ where: { id: lead.id }, data: { crm: conn.provider, externalId } }).catch(() => {});
-      }
-    } catch (err) {
-      console.error(`Push to ${conn.provider} failed`, err);
-      await db.crmConnection.update({ where: { id: conn.id }, data: { lastError: `Couldn't add a new lead: ${err instanceof Error ? err.message : "error"}`.slice(0, 500) } });
+    let ok = true;
+    // Import-only CRMs (Jobber): look for unsent leads by email.
+    if (!connector.push && connector.find) {
+      const waiting = await db.lead.findMany({ where: { businessId: conn.businessId, crm: null, email: { not: null }, occurredAt: { gte: new Date(Date.now() - 90 * 86_400_000) } }, take: 200 });
+      for (const l of waiting) await sendLeadToCrm(l, conn).catch(() => {});
     }
+    const leads = await db.lead.findMany({
+      where: { businessId: conn.businessId, crm: conn.provider, externalId: { not: null }, pushedAt: { gte: new Date(Date.now() - 365 * 86_400_000) } },
+      orderBy: { trackedAt: { sort: "asc", nulls: "first" } },
+      take: 500,
+    });
+    for (const l of leads) {
+      try {
+        await trackLead(l, conn);
+        checked++;
+      } catch (err) {
+        ok = false;
+        errors.push(`${conn.provider} ${l.id}: ${err instanceof Error ? err.message : "error"}`);
+      }
+    }
+    await db.crmConnection.update({
+      where: { id: conn.id },
+      data: { lastSyncAt: new Date(), lastSyncCount: leads.length, ...(ok ? { status: "active", lastError: null } : { lastError: errors[errors.length - 1]?.slice(0, 500) }) },
+    });
   }
+  return { connections: conns.length, checked, errors };
 }

@@ -96,77 +96,6 @@ export function isElevatedCampaign(utmCampaign: string | null | undefined) {
   return Boolean(utmCampaign && utmCampaign.toLowerCase().startsWith(ELEVATED_CAMPAIGN_PREFIX));
 }
 
-// ---------------------------------------------------------------------------
-// CSV import
-
-/** RFC 4180-style CSV parser: quoted fields, escaped quotes, commas and newlines in quotes. */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let quoted = false;
-  const src = text.replace(/^﻿/, "");
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (quoted) {
-      if (c === '"') {
-        if (src[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else quoted = false;
-      } else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") {
-      row.push(field);
-      field = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && src[i + 1] === "\n") i++;
-      row.push(field);
-      field = "";
-      if (row.some((v) => v.trim() !== "")) rows.push(row);
-      row = [];
-    } else field += c;
-  }
-  row.push(field);
-  if (row.some((v) => v.trim() !== "")) rows.push(row);
-  return rows;
-}
-
-export const IMPORT_FIELDS = ["name", "firstName", "lastName", "email", "phone", "company", "source", "status", "value", "date"] as const;
-export type ImportField = (typeof IMPORT_FIELDS)[number];
-export type Mapping = Partial<Record<ImportField, number>>;
-
-const GUESS: Record<ImportField, RegExp> = {
-  name: /^(full ?name|name|contact|contact name|customer|client|customer name|client name|person)$/i,
-  firstName: /^(first|first ?name|given ?name|fname)$/i,
-  lastName: /^(last|last ?name|surname|family ?name|lname)$/i,
-  email: /e-?mail/i,
-  phone: /phone|mobile|cell|tel/i,
-  company: /company|organi[sz]ation|business|account/i,
-  source: /source|channel|origin|how did|referr|medium|utm_source/i,
-  status: /status|stage|lifecycle|outcome/i,
-  value: /value|amount|revenue|total|price|deal size|sale/i,
-  date: /date|created|added|since|first seen|close/i,
-};
-
-/** Guesses which spreadsheet column holds which field. */
-export function guessMapping(headers: string[]): Mapping {
-  const map: Mapping = {};
-  const used = new Set<number>();
-  for (const f of IMPORT_FIELDS) {
-    const idx = headers.findIndex((h, i) => !used.has(i) && GUESS[f].test(h.trim()));
-    if (idx >= 0) {
-      map[f] = idx;
-      used.add(idx);
-    }
-  }
-  if (map.name !== undefined && (map.firstName !== undefined || map.lastName !== undefined)) {
-    // Prefer explicit first/last when both exist.
-    if (map.firstName !== undefined && map.lastName !== undefined) delete map.name;
-  }
-  return map;
-}
-
 export function parseMoneyToCents(v: string | null | undefined) {
   const n = Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
@@ -187,48 +116,6 @@ export function parseDate(v: string | null | undefined): Date | null {
   if (!s) return null;
   const d = new Date(s);
   return Number.isNaN(d.getTime()) || d.getFullYear() < 1990 || d.getTime() > Date.now() + 86_400_000 ? null : d;
-}
-
-export type LeadDraft = {
-  name: string;
-  email: string | null;
-  phone: string | null;
-  company: string | null;
-  source: Channel;
-  status: LeadStatusValue;
-  valueCents: number;
-  occurredAt: Date | null;
-};
-
-const clean = (v: string | undefined) => (v ?? "").trim() || null;
-
-/** Turns spreadsheet rows into lead drafts using the confirmed column mapping. Rows with no name, email or phone are skipped. */
-export function rowsToLeads(rows: string[][], map: Mapping): LeadDraft[] {
-  const at = (r: string[], f: ImportField) => (map[f] === undefined ? undefined : r[map[f]!]);
-  const out: LeadDraft[] = [];
-  for (const r of rows) {
-    const email = clean(at(r, "email"))?.toLowerCase() ?? null;
-    const phone = clean(at(r, "phone"));
-    const company = clean(at(r, "company"));
-    const name =
-      clean(at(r, "name")) ??
-      ([clean(at(r, "firstName")), clean(at(r, "lastName"))].filter(Boolean).join(" ") || null) ??
-      company ??
-      email ??
-      phone;
-    if (!name && !email && !phone) continue;
-    out.push({
-      name: (name ?? email ?? phone)!.slice(0, 200),
-      email: email && /\S+@\S+\.\S+/.test(email) ? email.slice(0, 200) : null,
-      phone: phone?.slice(0, 50) ?? null,
-      company: company?.slice(0, 200) ?? null,
-      source: normalizeSource(at(r, "source")),
-      status: parseStatus(at(r, "status")),
-      valueCents: parseMoneyToCents(at(r, "value")),
-      occurredAt: parseDate(at(r, "date")),
-    });
-  }
-  return out;
 }
 
 // ---------------------------------------------------------------------------

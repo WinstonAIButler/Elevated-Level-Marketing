@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/format";
 import { CHANNEL_LABELS, type Channel } from "@/lib/leads-core";
 import { CONNECTORS } from "@/lib/crm";
 import { deleteLead, updateLead } from "@/app/actions/leads";
-import { AddLeadForm } from "./Forms";
+import { AddLeadForm, SendToCrmButton } from "./Forms";
 
 export const metadata = { title: "Leads" };
 
@@ -22,11 +22,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     ...(source === "elevated" ? { elevated: true } : source ? { source } : {}),
     ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }] } : {}),
   };
-  const [leads, total, counts, crmCount] = await Promise.all([
+  const [leads, total, counts, crm] = await Promise.all([
     db.lead.findMany({ where, orderBy: { occurredAt: "desc" }, take: 200 }),
     db.lead.count({ where }),
     db.lead.groupBy({ by: ["status"], where: { businessId: business.id }, _count: true }),
-    db.crmConnection.count({ where: { businessId: business.id } }),
+    db.crmConnection.findFirst({ where: { businessId: business.id, status: "active" }, orderBy: { createdAt: "asc" } }),
   ]);
   const count = (s: LeadStatus) => counts.find((c) => c.status === s)?._count ?? 0;
   const all = counts.reduce((a, c) => a + c._count, 0);
@@ -40,14 +40,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="row">
           <Link href="/dashboard/results" className="btn btn-ghost">See results</Link>
-          <Link href="/dashboard/leads/connect" className="btn btn-primary">Import &amp; connect</Link>
+          <Link href="/dashboard/leads/connect" className="btn btn-primary">Connect</Link>
         </div>
       </div>
 
       {all === 0 && (
         <div className="alert alert-info" style={{ marginBottom: 20 }}>
           <strong>Start here:</strong> import your existing customers and leads (spreadsheet or CRM) so we have a “before” to compare against,
-          then add the Elevated form to your website so new leads arrive here automatically. <Link href="/dashboard/leads/connect">Import &amp; connect →</Link>
+          add the Elevated form to your website so new leads arrive here automatically, and connect your CRM so we can follow them to a sale. <Link href="/dashboard/leads/connect">Connect →</Link>
         </div>
       )}
 
@@ -85,6 +85,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                     <td className="small">
                       {CHANNEL_LABELS[l.source as Channel] ?? l.source}
                       {l.elevated && <div><span className="badge badge-good">via Elevated</span></div>}
+                      {l.crm ? <div className="muted">In {CONNECTORS[l.crm].name}{l.crmStage ? ` · ${l.crmStage}` : ""}</div> : crm ? <SendToCrmButton id={l.id} crmName={CONNECTORS[crm.provider].name} /> : null}
                     </td>
                     <td>
                       <form action={updateLead} className="row" style={{ gap: 6 }}>
@@ -107,7 +108,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <p className="muted">No leads {status || source || q ? "match these filters" : "yet"}.</p>
           )}
           {total > leads.length && <p className="small muted">Showing the newest {leads.length} of {total}.</p>}
-          {crmCount > 0 && <p className="small muted">Status and value for CRM contacts update from your CRM each day.</p>}
+          {crm && <p className="small muted">Leads sent to {CONNECTORS[crm.provider].name} update from it every day.</p>}
         </div>
         <div className="card">
           <h2>Add a lead</h2>

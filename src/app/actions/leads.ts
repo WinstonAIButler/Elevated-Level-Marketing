@@ -3,9 +3,9 @@ import { revalidatePath } from "next/cache";
 import type { LeadStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
-import { importLeadDrafts, recordLead } from "@/lib/leads";
-import { CHANNELS, IMPORT_FIELDS, normalizeSource, parseMoneyToCents, rowsToLeads, type Mapping } from "@/lib/leads-core";
-import { CONNECTORS, isCrmProvider, saveCrmConnection, syncCrm } from "@/lib/crm";
+import { recordLead } from "@/lib/leads";
+import { CHANNELS, normalizeSource, parseMoneyToCents } from "@/lib/leads-core";
+import { CONNECTORS, isCrmProvider, saveCrmConnection, sendLeadToCrm, trackAllLeads, trackLead } from "@/lib/crm";
 import { encryptionEnabled } from "@/lib/crypto";
 import { logActivity } from "@/lib/usage";
 import type { ActionState } from "./adspend";
@@ -65,31 +65,6 @@ export async function deleteLead(form: FormData) {
   refresh();
 }
 
-/** Spreadsheet import: the browser parses the file and sends rows plus the confirmed column mapping. */
-export async function importCsv(_: ActionState, form: FormData): Promise<ActionState> {
-  const { business } = await requireBusiness();
-  let rows: string[][];
-  let mapping: Mapping;
-  try {
-    rows = JSON.parse(String(form.get("rows") ?? "[]"));
-    mapping = JSON.parse(String(form.get("mapping") ?? "{}"));
-  } catch {
-    return { error: "Couldn't read that file. Please try again." };
-  }
-  if (!Array.isArray(rows) || !rows.length) return { error: "No rows to import." };
-  if (rows.length > 10_000) return { error: "That's more than 10,000 rows. Split the file and import it in parts." };
-  const clean: Mapping = {};
-  for (const f of IMPORT_FIELDS) if (Number.isInteger(mapping[f])) clean[f] = mapping[f];
-  if (clean.name === undefined && clean.firstName === undefined && clean.email === undefined && clean.phone === undefined) {
-    return { error: "Match at least one column to Name, Email or Phone." };
-  }
-  const drafts = rowsToLeads(rows.map((r) => (Array.isArray(r) ? r.map(String) : [])), clean);
-  const { imported, skipped } = await importLeadDrafts(business.id, drafts);
-  await logActivity(business.id, "leads", `Imported ${imported} contact${imported === 1 ? "" : "s"} from a spreadsheet`);
-  refresh();
-  return { ok: `Imported ${imported} contact${imported === 1 ? "" : "s"}${skipped ? `; skipped ${skipped} already on file or blank` : ""}.` };
-}
-
 export async function connectCrmToken(_: ActionState, form: FormData): Promise<ActionState> {
   const { business } = await requireBusiness();
   const provider = String(form.get("provider"));
@@ -98,29 +73,45 @@ export async function connectCrmToken(_: ActionState, form: FormData): Promise<A
   if (!encryptionEnabled()) return { error: "CRM connections aren't available yet. Please try again later." };
   if (token.length < 10) return { error: `Paste your ${CONNECTORS[provider].tokenLabel ?? "key"}.` };
   try {
-    const conn = await saveCrmConnection(business.id, provider, { method: "token", accessToken: token });
-    const r = await syncCrm(conn);
+    await saveCrmConnection(business.id, provider, { method: "token", accessToken: token });
     refresh();
     revalidatePath("/dashboard/leads/connect");
-    return { ok: `${CONNECTORS[provider].name} connected. Imported ${r.total} contact${r.total === 1 ? "" : "s"}.` };
+    return { ok: `${CONNECTORS[provider].name} connected. New leads from Elevated will go there, and we'll follow each one to a sale.` };
   } catch (err) {
     return { error: `Couldn't connect: ${errorText(err)}. Check the key and its permissions.` };
   }
 }
 
-export async function syncCrmNow(_: ActionState, form: FormData): Promise<ActionState> {
+/** Re-checks every lead this business sent to its CRM. */
+export async function checkCrmNow(_: ActionState): Promise<ActionState> {
   const { business } = await requireBusiness();
-  const conn = await db.crmConnection.findFirst({ where: { id: String(form.get("id")), businessId: business.id } });
-  if (!conn) return { error: "Connection not found." };
   try {
-    const r = await syncCrm(conn);
+    const r = await trackAllLeads(business.id);
     refresh();
     revalidatePath("/dashboard/leads/connect");
-    return { ok: `Synced ${r.total} records (${r.created} new).` };
+    if (r.errors.length) return { error: `Checked ${r.checked}; some couldn't be read: ${r.errors[0]}` };
+    return { ok: `Checked ${r.checked} lead${r.checked === 1 ? "" : "s"} in your CRM.` };
   } catch (err) {
-    revalidatePath("/dashboard/leads/connect");
     return { error: errorText(err) };
   }
+}
+
+/** Sends one lead to the CRM by hand (when automatic sending is off, or it failed). */
+export async function sendToCrm(_: ActionState, form: FormData): Promise<ActionState> {
+  const { business } = await requireBusiness();
+  const lead = await db.lead.findFirst({ where: { id: String(form.get("id")), businessId: business.id } });
+  if (!lead) return { error: "Lead not found." };
+  try {
+    const r = await sendLeadToCrm(lead);
+    if (!r.sent) return { error: r.reason };
+    const fresh = await db.lead.findUnique({ where: { id: lead.id } });
+    const conn = fresh?.crm ? await db.crmConnection.findFirst({ where: { businessId: business.id, provider: fresh.crm } }) : null;
+    if (fresh && conn) await trackLead(fresh, conn).catch(() => {});
+  } catch (err) {
+    return { error: errorText(err) };
+  }
+  refresh();
+  return { ok: "Sent." };
 }
 
 export async function setCrmPush(form: FormData) {

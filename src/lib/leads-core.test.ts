@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessMapping, isElevatedCampaign, normalizeSource, parseCsv, parseMoneyToCents, parseStatus, resultsSummary, rowsToLeads, tagLink } from "./leads-core";
+import { isElevatedCampaign, normalizeSource, parseDate, parseMoneyToCents, parseStatus, resultsSummary, tagLink } from "./leads-core";
 
 describe("normalizeSource", () => {
   it("maps common labels onto channels", () => {
@@ -29,35 +29,15 @@ describe("tagLink", () => {
   });
 });
 
-describe("CSV import", () => {
-  it("parses quotes, commas and newlines inside fields", () => {
-    const rows = parseCsv('Name,Email,Notes\r\n"Doe, Jane",jane@x.com,"line1\nline2"\nBob,"bob@x.com","He said ""hi"""\n');
-    expect(rows).toEqual([
-      ["Name", "Email", "Notes"],
-      ["Doe, Jane", "jane@x.com", "line1\nline2"],
-      ["Bob", "bob@x.com", 'He said "hi"'],
-    ]);
-  });
-
-  it("guesses columns and builds leads", () => {
-    const [headers, ...rows] = parseCsv(
-      "First Name,Last Name,Email Address,Mobile Phone,Lead Source,Deal Stage,Amount,Created Date\nAna,Ruiz,ANA@X.COM,555-1000,Facebook,Closed Won,\"$1,250.00\",2026-03-02\n,,,,,,,\nBen,,,,Google,Lost,,\n",
-    );
-    const map = guessMapping(headers);
-    expect(map).toMatchObject({ firstName: 0, lastName: 1, email: 2, phone: 3, source: 4, status: 5, value: 6, date: 7 });
-    const leads = rowsToLeads(rows, map);
-    expect(leads).toHaveLength(2);
-    expect(leads[0]).toMatchObject({ name: "Ana Ruiz", email: "ana@x.com", source: "facebook", status: "WON", valueCents: 125_000 });
-    expect(leads[0].occurredAt?.getFullYear()).toBe(2026);
-    expect(leads[1]).toMatchObject({ name: "Ben", source: "google", status: "LOST" });
-  });
-
+describe("parsing CRM values", () => {
   it("reads money and statuses loosely", () => {
     expect(parseMoneyToCents("$2,000")).toBe(200_000);
     expect(parseMoneyToCents("n/a")).toBe(0);
     expect(parseStatus("Paid")).toBe("WON");
     expect(parseStatus("Estimate sent")).toBe("CONTACTED");
     expect(parseStatus("")).toBe("NEW");
+    expect(parseDate("2026-03-02")?.getFullYear()).toBe(2026);
+    expect(parseDate("not a date")).toBeNull();
   });
 });
 
