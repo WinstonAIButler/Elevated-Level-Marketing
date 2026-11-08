@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { CHANNELS } from "@/lib/channels";
 import { addDays, formatDate } from "@/lib/format";
-import { TIERS } from "@/lib/tiers";
+import { PAID_TIERS, TIERS } from "@/lib/tiers";
+import { livePrices } from "@/lib/stripe-prices";
+import { marginAtPrice, TARGET_MARGIN } from "@/lib/pricing-model";
 import { confirmAccess, markPublished, retryFromHub } from "@/app/actions/hub";
 
 export const dynamic = "force-dynamic";
@@ -34,9 +36,10 @@ export default async function OwnersHub() {
     db.activity.groupBy({ by: ["businessId"], _max: { createdAt: true } }),
   ]);
 
+  const live = await livePrices();
   const lastByBusiness = new Map(lastActivity.map((a) => [a.businessId, a._max.createdAt]));
   const paying = users.filter((u) => u.tier !== "TRIAL" && (u.subscriptionStatus === "active" || u.subscriptionStatus === "trialing"));
-  const mrr = paying.reduce((sum, u) => sum + TIERS[u.tier].price, 0);
+  const mrr = paying.reduce((sum, u) => sum + (live[u.tier] ? live[u.tier]!.cents / 100 : TIERS[u.tier].price), 0);
   const byTier = (["TRIAL", "STARTER", "GROWTH", "ELITE"] as const).map((t) => ({ t, n: users.filter((u) => u.tier === t).length }));
   const newSignups = users.filter((u) => u.createdAt >= since30).length;
   const walletTotal = users.reduce((s, u) => s + (u.business?.walletBalanceCents ?? 0), 0);
@@ -61,6 +64,38 @@ export default async function OwnersHub() {
         <div className="card"><div className="muted small">Wallet top-ups, 30 days</div><div className="stat">{usd(topups._sum.amountCents ?? 0)}</div></div>
         <div className="card"><div className="muted small">Ad spend, 30 days</div><div className="stat">{usd(spend._sum.spendCents ?? 0)}</div><div className="muted small">{liveAds} ad campaign{liveAds === 1 ? "" : "s"} live</div></div>
         <div className="card"><div className="muted small">Waiting on client approval</div><div className="stat">{pendingApprovals}</div></div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }} id="pricing">
+        <h2>Plan prices</h2>
+        <p className="muted small">
+          Read from Stripe every 5 minutes. To change a price, add a new monthly price on the plan&apos;s product in Stripe (and
+          make it the default); the site and checkout switch to it automatically. Existing subscribers stay on their old price
+          until moved.
+        </p>
+        <table className="simple">
+          <thead><tr><th>Plan</th><th>Price in Stripe</th><th>Margin at full use</th><th>Found by</th></tr></thead>
+          <tbody>
+            {PAID_TIERS.map((t) => {
+              const p = live[t.id];
+              const m = p ? marginAtPrice(t, p.cents / 100) : null;
+              return (
+                <tr key={t.id}>
+                  <td><strong>{t.name}</strong></td>
+                  <td>{p ? `${usd(p.cents)}/mo` : <span className="badge badge-bad">Not found in Stripe</span>}</td>
+                  <td>
+                    {m === null ? "–" : (
+                      <span className={`badge ${m >= TARGET_MARGIN ? "badge-good" : "badge-bad"}`}>
+                        {(m * 100).toFixed(0)}%{m < TARGET_MARGIN ? " · below 40% target" : ""}
+                      </span>
+                    )}
+                  </td>
+                  <td className="small muted">{p ? { env: "Vercel setting", lookup_key: "Stripe lookup key", product: `Product "Elevated ${t.name}"` }[p.source] : `Add a monthly price to a product named "Elevated ${t.name}"`}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }} id="queue">

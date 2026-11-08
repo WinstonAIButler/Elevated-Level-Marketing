@@ -283,3 +283,35 @@ fieldset .option + .option { margin-top: 8px; }
 .checklist li.done { color: var(--muted); text-decoration: line-through; }
 .checklist li.done::before { border-color: var(--green-strong); background: var(--green-strong); }
 .btn.disabled { opacity: 0.5; pointer-events: none; }
+
+/* Home page refresh */
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+.hero-split h1 { max-width: 18ch; }
+.hero-card { color: var(--ink); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); }
+.hero-card .grid-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+.hero-points { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 8px; color: #dfe5ea; }
+.hero-points li { padding-left: 28px; position: relative; }
+.hero-points li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+.btn-block { width: 100%; }
+.eyebrow { text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.78rem; font-weight: 700; color: var(--green-strong); margin: 0 0 8px; }
+.shift-card { border-top: 4px solid var(--green); }
+.outcome { border-left: 4px solid var(--green); }
+.compare-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.compare { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 0.95rem; }
+.compare th, .compare td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+.compare thead th { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.compare tbody th { font-weight: 600; }
+.compare .us { background: var(--green-soft); font-weight: 600; color: var(--ink); }
+.compare thead .us { color: var(--green-strong); }
+.compare tr:last-child th, .compare tr:last-child td { border-bottom: 0; }
+.promise-row { list-style: none; padding: 0; margin: 28px auto 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 1000px; }
+.promise-row li { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-size: 0.9rem; text-align: center; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 960px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .promise-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .hero-card .grid-2 { grid-template-columns: 1fr; }
+  .promise-row { grid-template-columns: 1fr; }
+}

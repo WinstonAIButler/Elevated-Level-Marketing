@@ -1,3 +1,4 @@
+import { displayPrices } from "@/lib/stripe-prices";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { stripeEnabled } from "@/lib/stripe";
@@ -9,6 +10,7 @@ export const metadata = { title: "Billing" };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string }> }) {
   const user = await requireUser();
+  const prices = await displayPrices();
   const { success, error } = await searchParams;
   const usage = user.business ? await usageThisMonth(user.business.id) : { assessments: 0, plans: 0, campaigns: 0, images: 0 };
   const current = TIERS[user.tier];
@@ -54,7 +56,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         {PAID_TIERS.map((t) => (
           <div className={`card ${t.id === user.tier ? "featured" : ""}`} key={t.id}>
             <h3>{t.name}</h3>
-            <div className="price">${t.price}<small>/month</small></div>
+            <div className="price">${prices[t.id].toLocaleString()}<small>/month</small></div>
             <p className="small" style={{ margin: "2px 0 8px", fontWeight: 600 }}>+ ad spend, at the budget you set</p>
             <ul className="feature-list">{t.features.map((f) => <li key={f}>{f}</li>)}</ul>
             {t.id === user.tier ? (
