@@ -113,12 +113,50 @@ export default async function Home() {
                 <li>Agency-level marketing from ${prices.STARTER}/month</li>
                 <li>No contract. Free trial, no card required</li>
               </ul>
+              <a href="#video" className="watch-link">
+                <span className="watch-icon" aria-hidden="true">▶</span> Watch how it works <span className="muted">(3 min)</span>
+              </a>
             </div>
             <div className="card hero-card" id="check">
               <h2 style={{ fontSize: "1.25rem", marginBottom: 4 }}>Is AI recommending your business?</h2>
               <p className="muted small" style={{ marginTop: 0 }}>Enter your details. We run real searches and show you the results.</p>
               <CheckForm compact />
             </div>
+          </div>
+        </section>
+
+        <section className="section section-white video-section" id="video" aria-labelledby="video-title">
+          <div className="container">
+            <div className="section-title">
+              <p className="eyebrow">See it in action</p>
+              <h2 id="video-title" className="h2-lg">How Elevated Level Marketing works, in 3 minutes</h2>
+            </div>
+            <div className="video-frame">
+              <video
+                controls
+                playsInline
+                preload="none"
+                poster="https://b1ldcowtzowsqiv8.public.blob.vercel-storage.com/media/elevated-level-marketing-commercial-poster.jpg"
+                aria-describedby="video-note"
+              >
+                <source src="https://b1ldcowtzowsqiv8.public.blob.vercel-storage.com/media/elevated-level-marketing-commercial.mp4" type="video/mp4" />
+                Your browser can&apos;t play this video. <a href="https://b1ldcowtzowsqiv8.public.blob.vercel-storage.com/media/elevated-level-marketing-commercial.mp4">Download it here</a>.
+              </video>
+            </div>
+            <p id="video-note" className="muted small" style={{ textAlign: "center", marginTop: 12 }}>Demo account shown · café scenes created with AI</p>
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{ __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "VideoObject",
+                name: "How Elevated Level Marketing works",
+                description: "A 3-minute walkthrough of Elevated Level Marketing: the free AI visibility check, marketing assessment, 12-week plan, weekly content with one-tap approvals, ad spend, CRM lead tracking, results and plans.",
+                thumbnailUrl: "https://b1ldcowtzowsqiv8.public.blob.vercel-storage.com/media/elevated-level-marketing-commercial-poster.jpg",
+                contentUrl: "https://b1ldcowtzowsqiv8.public.blob.vercel-storage.com/media/elevated-level-marketing-commercial.mp4",
+                uploadDate: "2026-11-09",
+                duration: "PT3M26S",
+              }) }}
+            />
           </div>
         </section>
 

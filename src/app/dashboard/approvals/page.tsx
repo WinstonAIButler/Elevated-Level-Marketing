@@ -58,7 +58,7 @@ export default async function ApprovalsPage() {
           <div className="queue-item" key={item.id}>
             <div className="row between">
               <h3 style={{ margin: 0 }}>{item.title}</h3>
-              <span className="badge badge-warn">{ad ? "Ad" : `${where} post`} · {ad ? `${(item.dailyBudgetCents / 100).toFixed(2)}/day` : formatDate(item.scheduledFor)}</span>
+              <span className="badge badge-warn">{ad ? "Ad" : `${where} post`} · {ad ? `$${(item.dailyBudgetCents / 100).toFixed(2)}/day` : formatDate(item.scheduledFor)}</span>
             </div>
             {ad && p.reason && <p className="small muted" style={{ marginTop: 8 }}>Why this channel: {p.reason}</p>}
             {ad && (
