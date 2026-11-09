@@ -390,3 +390,12 @@ fieldset .option + .option { margin-top: 8px; }
   .leads-table td:nth-child(3) form > * { margin: 0; }
   .leads-table td:nth-child(3) select { width: auto; flex: 1 1 120px; }
 }
+
+/* Home page video */
+.watch-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; color: #fff; font-weight: 600; text-decoration: none; }
+.watch-link .muted { color: #aab3bd; font-weight: 500; }
+.watch-link:hover { color: var(--green); }
+.watch-icon { width: 36px; height: 36px; border-radius: 50%; background: var(--green); color: var(--ink); display: inline-grid; place-items: center; font-size: 0.8rem; padding-left: 2px; }
+.video-frame { max-width: 1000px; margin: 0 auto; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: #000; box-shadow: 0 2px 6px rgba(31,37,44,.08), 0 24px 60px rgba(31,37,44,.18); }
+.video-frame video { width: 100%; height: 100%; display: block; background: #000; }
+@media (max-width: 860px) { .video-frame { border-radius: 10px; } .watch-link { margin-top: 12px; } }
